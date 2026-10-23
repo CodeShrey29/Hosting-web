@@ -11,6 +11,7 @@ import {
   Globe,
   Gamepad2,
   Terminal,
+  X,
 } from 'lucide-react'
 import { cn } from '../lib/utils'
 
@@ -49,24 +50,34 @@ const navItems = [
   },
 ]
 
-export default function Sidebar() {
+export default function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
   return (
-    <aside className="w-64 border-r bg-card flex flex-col">
-      <div className="p-6 border-b">
-        <h1 className="text-xl font-bold tracking-tight">Cloud Host</h1>
-        <p className="text-xs text-muted-foreground mt-1">India-first · Local PC</p>
+    <aside className="h-full w-64 bg-card border-r flex flex-col">
+      <div className="p-5 border-b flex items-center justify-between">
+        <div>
+          <h1 className="text-lg font-bold tracking-tight">Cloud Host</h1>
+          <p className="text-xs text-muted-foreground mt-0.5">India-first · Local PC</p>
+        </div>
+        <button
+          onClick={onNavigate}
+          className="lg:hidden p-1 rounded-md hover:bg-accent"
+          aria-label="Close menu"
+        >
+          <X className="h-5 w-5" />
+        </button>
       </div>
-      <nav className="flex-1 overflow-y-auto p-4 space-y-6">
+      <nav className="flex-1 overflow-y-auto p-3 space-y-5">
         {navItems.map((group) => (
           <div key={group.section}>
-            <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2 px-3">
+            <h3 className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-1.5 px-3">
               {group.section}
             </h3>
-            <div className="space-y-1">
+            <div className="space-y-0.5">
               {group.items.map((item) => (
                 <NavLink
                   key={item.to}
                   to={item.to}
+                  onClick={onNavigate}
                   className={({ isActive }) =>
                     cn(
                       'flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-colors',
@@ -76,7 +87,7 @@ export default function Sidebar() {
                     )
                   }
                 >
-                  <item.icon className="h-4 w-4" />
+                  <item.icon className="h-4 w-4 shrink-0" />
                   {item.label}
                 </NavLink>
               ))}

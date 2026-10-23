@@ -1,23 +1,26 @@
 # Hosting Platform — Local PC Edition
 
+## Render
+
+**Build command:**
+```bash
+pip install -r requirements.txt && cd frontend && npm install && npm run build
+```
+
+**Start command:**
 ```bash
 python hosting.py
 ```
 
-## Features now
-- Simple local auth (`POST /api/auth/login`)
-- ZIP upload → extract into volume → deploy
-- Container logs (`GET /api/projects/<id>/logs`)
-- Plan enforcement (RAM / storage / deployment limits)
-- Persistent volumes in `data/volumes/`
-- Stop / Delete projects from the UI
-- Live dashboard with real usage
-- Auto-builds frontend on first run
+## Features
+- Real Docker containers with RAM limits + volumes
+- Deployment templates (Python, Node.js, Website, Minecraft, Custom)
+- Plan enforcement
+- Start / Stop / Delete / Logs
+- Live dashboard
+- SQLite + everything stays on the machine
 
-## Data (stays on your PC)
-- `data/hosting.db`
-- `data/volumes/`
-- `data/uploads/`
-
-Docker required for real containers.
-Optional login secret: `local-pc-secret`
+## Local
+```bash
+python hosting.py
+```

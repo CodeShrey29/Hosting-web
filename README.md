@@ -1,9 +1,8 @@
 # Hosting Platform — Local PC Edition
 
-Complete frontend + simple Python entry point.  
-Designed for your PC, easy to test on Render.
+Real control plane + Docker worker that runs entirely on your PC.
 
-## One-command start
+## Start
 
 ```bash
 pip install -r requirements.txt
@@ -13,18 +12,19 @@ python hosting.py
 
 Open http://localhost:5000
 
-## Render
-- Build: `cd frontend && npm install && npm run build`
-- Start: `python hosting.py`
-- `requirements.txt` is included
+## What works now
+- SQLite database (data/hosting.db) — stays on the PC
+- Real Docker integration (start/stop containers with RAM limits)
+- Resource reservation on the local worker
+- Projects stored and tracked
+- Frontend connected to live API
+- `/api/status`, `/api/projects`, deploy flow
 
-## Frontend features
-- Premium dashboard
-- Projects grid
-- Multi-step Deploy wizard
-- Servers / Monitoring / Billing / Settings
-- Command palette (Ctrl+K / Cmd+K)
-- Dark / Light mode
-- Fully local — nothing leaves the machine
+## Requirements
+- Python 3.10+
+- Docker running on the same machine
+- Node.js (only for building frontend)
 
-Pull latest and run. Ready for testing.
+Everything stays on this PC. No external database or cloud required.
+
+Next steps from the full prompt: better scheduler, storage volumes, metering, auth, and plan enforcement.

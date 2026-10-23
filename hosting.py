@@ -48,7 +48,10 @@ def ensure_frontend():
 app = Flask(__name__, static_folder=str(DIST) if DIST.exists() else None, static_url_path="")
 render_mode = get_deployment_mode() == "render"
 if auth_required() and not admin_auth_configured():
-    raise RuntimeError("ADMIN_EMAIL and ADMIN_PASSWORD are required when the control plane is exposed.")
+    raise RuntimeError(
+        "The control plane is exposed but administrator credentials are missing or invalid. "
+        "Configure ADMIN_EMAIL and an ADMIN_PASSWORD with at least 16 characters."
+    )
 secret_key = os.environ.get("SECRET_KEY")
 if render_mode and not secret_key:
     raise RuntimeError("SECRET_KEY must be configured in the Render environment.")

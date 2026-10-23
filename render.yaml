@@ -13,9 +13,9 @@ services:
       - key: SECRET_KEY
         generateValue: true
       - key: ADMIN_EMAIL
-        sync: false
+        value: admin@local.host
       - key: ADMIN_PASSWORD
-        sync: false
+        generateValue: true
       - key: DATA_DIR
         value: /var/data
       - key: PERSISTENT_STORAGE

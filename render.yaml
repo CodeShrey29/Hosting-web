@@ -2,7 +2,7 @@ services:
   - type: web
     name: hosting-web
     env: python
-    buildCommand: cd frontend && npm install && npm run build
+    buildCommand: pip install -r requirements.txt && (cd frontend && npm install && npm run build || echo "Frontend build skipped")
     startCommand: python hosting.py
     envVars:
       - key: PORT

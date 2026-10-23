@@ -1,39 +1,35 @@
 # Hosting Platform — Local PC Edition
 
-A high-quality, production-oriented cloud hosting platform UI that runs entirely on your own PC.
+High-quality frontend + simple Python entry point. Designed for your PC, testable on Render.
 
-No external databases or cloud services are required for this version. Everything stays on your machine.
+## Start with one command
 
-## Tech Stack
-- React 18 + TypeScript
-- Vite
-- Tailwind CSS (dark/light mode)
-- React Router
-- Lucide icons
+```bash
+python hosting.py
+```
 
-## Features
-- Premium dashboard with resource cards
-- Full sidebar (Overview, Host, Projects, Infrastructure, Account)
-- Deploy page with source options
-- Local worker status panel
-- Responsive layout
-- Theme toggle
-
-## Quick Start
+(If the frontend is not built yet, first run:)
 
 ```bash
 cd frontend
 npm install
-npm run dev
+npm run build
+cd ..
+python hosting.py
 ```
 
-Then open **http://localhost:5173**
+Then open http://localhost:5000
 
-## Next Steps
-This is the solid frontend foundation. The next pieces (still fully local on your PC) will be:
-- Local backend API
-- Docker worker agent
-- Real resource limits and metering
-- File uploads and project detection
+## On Render
+- Build command: `cd frontend && npm install && npm run build`
+- Start command: `python hosting.py`
+- It serves the built frontend + simple local API stubs.
 
-All designed so it can later scale beyond a single PC.
+## Features
+- Premium dashboard
+- Servers, Monitoring, Billing, Settings pages
+- Deploy flow
+- Dark/light mode
+- Everything stays local / on the machine it runs on
+
+Next: real local Docker worker and resource enforcement.

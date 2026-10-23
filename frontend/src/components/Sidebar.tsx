@@ -50,20 +50,20 @@ const navItems = [
 
 export default function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
   return (
-    <aside className="h-full w-64 bg-card/80 backdrop-blur-xl border-r flex flex-col">
+    <aside className="h-full w-64 bg-card border-r flex flex-col">
       <div className="p-5 flex items-center justify-between">
-        <div className="flex items-center gap-2.5">
-          <div className="h-8 w-8 rounded-lg bg-primary flex items-center justify-center">
-            <Cloud className="h-4 w-4 text-white" />
+        <div className="flex items-center gap-3">
+          <div className="h-9 w-9 rounded-xl bg-primary flex items-center justify-center shadow-sm">
+            <Cloud className="h-5 w-5 text-white" />
           </div>
           <div>
             <h1 className="font-semibold text-sm">Cloud Host</h1>
-            <p className="text-[10px] text-muted-foreground">Local PC</p>
+            <p className="text-[11px] text-muted-foreground">Local PC</p>
           </div>
         </div>
         <button
           onClick={onNavigate}
-          className="lg:hidden p-1.5 rounded-md hover:bg-accent"
+          className="lg:hidden p-1.5 rounded-lg hover:bg-accent"
         >
           <X className="h-4 w-4" />
         </button>
@@ -72,7 +72,7 @@ export default function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
       <nav className="flex-1 overflow-y-auto px-3 pb-4 space-y-6">
         {navItems.map((group) => (
           <div key={group.section}>
-            <h3 className="text-[10px] font-medium text-muted-foreground uppercase tracking-widest mb-2 px-3">
+            <h3 className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider mb-2 px-3">
               {group.section}
             </h3>
             <div className="space-y-0.5">
@@ -83,7 +83,7 @@ export default function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
                   onClick={onNavigate}
                   className={({ isActive }) =>
                     cn(
-                      'flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-all',
+                      'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-all',
                       isActive
                         ? 'bg-primary text-white shadow-sm'
                         : 'text-muted-foreground hover:text-foreground hover:bg-accent'
@@ -99,10 +99,13 @@ export default function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
         ))}
       </nav>
 
-      <div className="p-4 mx-3 mb-3 rounded-lg bg-secondary/50 text-xs text-muted-foreground">
-        <div className="flex items-center gap-2">
-          <span className="h-2 w-2 rounded-full bg-green-500 animate-pulse" />
-          Worker healthy
+      <div className="p-3 mx-3 mb-4 rounded-xl bg-secondary/60">
+        <div className="flex items-center gap-2 text-xs">
+          <span className="relative flex h-2 w-2">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75" />
+            <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500" />
+          </span>
+          <span className="text-muted-foreground">Worker healthy</span>
         </div>
       </div>
     </aside>

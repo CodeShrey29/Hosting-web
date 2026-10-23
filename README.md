@@ -1,23 +1,23 @@
 # Hosting Platform — Local PC Edition
 
-Just run:
-
 ```bash
 python hosting.py
 ```
 
-## What works now
-- Real control plane (SQLite)
-- Docker containers with RAM limits + persistent volumes
-- Plan enforcement (Free: 512 MB RAM, 1 GB storage, 3 deployments)
-- Resource reservation on local worker
-- File upload endpoint
-- Live dashboard showing real usage vs plan limits
+## Features now
+- Simple local auth (`POST /api/auth/login`)
+- ZIP upload → extract into volume → deploy
+- Container logs (`GET /api/projects/<id>/logs`)
+- Plan enforcement (RAM / storage / deployment limits)
+- Persistent volumes in `data/volumes/`
+- Stop / Delete projects from the UI
+- Live dashboard with real usage
 - Auto-builds frontend on first run
 
-## Data location (on your PC)
-- Database: `data/hosting.db`
-- Volumes: `data/volumes/`
-- Uploads: `data/uploads/`
+## Data (stays on your PC)
+- `data/hosting.db`
+- `data/volumes/`
+- `data/uploads/`
 
-Everything stays on this machine. Docker required for real deployments.
+Docker required for real containers.
+Optional login secret: `local-pc-secret`

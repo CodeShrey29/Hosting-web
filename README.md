@@ -2,23 +2,22 @@
 
 A high-quality, production-oriented cloud hosting platform UI that runs entirely on your own PC.
 
-No external databases, no cloud services required for the initial version. Everything stays on your machine.
+No external databases or cloud services are required for this version. Everything stays on your machine.
 
 ## Tech Stack
 - React 18 + TypeScript
 - Vite
-- Tailwind CSS
+- Tailwind CSS (dark/light mode)
 - React Router
 - Lucide icons
 
-## Features (Frontend)
-- Premium dark/light dashboard
-- Full sidebar matching the platform specification
-- Resource usage cards
-- Deploy flow shell
-- Local worker status
+## Features
+- Premium dashboard with resource cards
+- Full sidebar (Overview, Host, Projects, Infrastructure, Account)
+- Deploy page with source options
+- Local worker status panel
 - Responsive layout
-- Command search bar
+- Theme toggle
 
 ## Quick Start
 
@@ -28,6 +27,13 @@ npm install
 npm run dev
 ```
 
-Open http://localhost:5173
+Then open **http://localhost:5173**
 
-This is the real frontend foundation. Backend, local Docker worker, and full resource enforcement will be added next while keeping everything on your PC.
+## Next Steps
+This is the solid frontend foundation. The next pieces (still fully local on your PC) will be:
+- Local backend API
+- Docker worker agent
+- Real resource limits and metering
+- File uploads and project detection
+
+All designed so it can later scale beyond a single PC.

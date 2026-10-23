@@ -1,19 +1,22 @@
 """Local Docker worker with volume + env support."""
+import logging
 import docker
 from docker.errors import DockerException
 from pathlib import Path
+
+logger = logging.getLogger(__name__)
 
 def get_client():
     try:
         return docker.from_env()
     except DockerException as e:
-        print(f"Docker not available: {e}")
+        logger.warning("Docker is unavailable: %s", e)
         return None
 
 def list_containers():
     client = get_client()
     if not client:
-        return []
+        return {"error": "Docker is unavailable"}
     try:
         return [
             {
@@ -24,13 +27,14 @@ def list_containers():
             }
             for c in client.containers.list(all=True)
         ]
-    except Exception:
-        return []
+    except DockerException as error:
+        return {"error": f"Could not list Docker containers: {error}"}
 
 def run_container(
     image: str,
     name: str,
     ram_mb: int = 512,
+    cpu_limit: float = 0.5,
     volume_path: str = None,
     env: dict = None,
     command: str = None,
@@ -49,6 +53,12 @@ def run_container(
             "detach": True,
             "name": name,
             "mem_limit": f"{ram_mb}m",
+            "memswap_limit": f"{ram_mb}m",
+            "nano_cpus": int(cpu_limit * 1_000_000_000),
+            "pids_limit": 256,
+            "cap_drop": ["ALL"],
+            "security_opt": ["no-new-privileges:true"],
+            "tmpfs": {"/tmp": "rw,noexec,nosuid,size=64m"},
             "environment": env or {},
             "volumes": volumes,
             "restart_policy": {"Name": "unless-stopped"},
@@ -58,7 +68,7 @@ def run_container(
             kwargs["command"] = command
         container = client.containers.run(image, **kwargs)
         return {"id": container.id[:12], "name": container.name, "status": container.status}
-    except Exception as e:
+    except DockerException as e:
         return {"error": str(e)}
 
 def stop_container(name_or_id: str):
@@ -69,7 +79,7 @@ def stop_container(name_or_id: str):
         c = client.containers.get(name_or_id)
         c.stop()
         return {"status": "stopped"}
-    except Exception as e:
+    except DockerException as e:
         return {"error": str(e)}
 
 def remove_container(name_or_id: str):
@@ -80,13 +90,13 @@ def remove_container(name_or_id: str):
         c = client.containers.get(name_or_id)
         c.remove(force=True)
         return {"status": "removed"}
-    except Exception as e:
+    except DockerException as e:
         return {"error": str(e)}
 
 def get_docker_info():
     client = get_client()
     if not client:
-        return {"available": False}
+        return {"available": False, "error": "Docker daemon is unavailable"}
     try:
         info = client.info()
         return {
@@ -95,5 +105,5 @@ def get_docker_info():
             "containers": info.get("Containers"),
             "running": info.get("ContainersRunning"),
         }
-    except Exception:
-        return {"available": False}
+    except DockerException as error:
+        return {"available": False, "error": f"Could not query Docker daemon: {error}"}

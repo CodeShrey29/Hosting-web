@@ -40,7 +40,7 @@ TEMPLATES = {
 }
 
 def get_template(name: str):
-    return TEMPLATES.get(name, TEMPLATES["python"])
+    return TEMPLATES.get(name)
 
 def list_templates():
     return [{"id": k, **v} for k, v in TEMPLATES.items()]

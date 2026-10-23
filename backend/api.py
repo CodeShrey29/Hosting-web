@@ -1,253 +1,581 @@
-from flask import Blueprint, request, jsonify, session
-from .db import get_db, dict_from_row, init_db, get_plan, get_user_usage, VOLUMES_DIR, UPLOADS_DIR
-from . import docker_worker
-from .templates import get_template, list_templates
-from datetime import datetime
+import hmac
+import hashlib
+import ipaddress
+import math
 import os
-import zipfile
+import re
 import shutil
+import uuid
+from datetime import datetime, timedelta, timezone
+from pathlib import Path
+
+from flask import Blueprint, current_app, jsonify, request, session
+from werkzeug.utils import secure_filename
+
+from . import docker_worker
+from .db import (
+    DATA_DIR,
+    UPLOADS_DIR,
+    VOLUMES_DIR,
+    dict_from_row,
+    get_db,
+    get_plan,
+    get_user_usage,
+)
+from .templates import get_template, list_templates
 
 api = Blueprint("api", __name__, url_prefix="/api")
+PROJECT_NAME = re.compile(r"^[a-zA-Z0-9][a-zA-Z0-9._-]{0,47}$")
+PUBLIC_ENDPOINTS = {"/api/health", "/api/auth/me", "/api/auth/login"}
+WRITE_METHODS = {"POST", "PUT", "PATCH", "DELETE"}
 
-LOCAL_SECRET = os.environ.get("HOSTING_SECRET", "local-pc-secret")
+
+def get_deployment_mode():
+    return "render" if os.environ.get("RENDER", "").lower() == "true" else "local-pc"
+
+def auth_required():
+    if get_deployment_mode() == "render" or os.environ.get("HOSTING_REQUIRE_AUTH", "").lower() == "true":
+        return True
+    try:
+        return not ipaddress.ip_address(os.environ.get("HOSTING_HOST", "127.0.0.1")).is_loopback
+    except ValueError:
+        return True
+
+def admin_auth_configured():
+    return bool(os.environ.get("ADMIN_EMAIL") and len(os.environ.get("ADMIN_PASSWORD", "")) >= 16)
+
+def admin_auth_version():
+    return hmac.new(
+        str(current_app.secret_key).encode(),
+        os.environ["ADMIN_PASSWORD"].encode(),
+        hashlib.sha256,
+    ).hexdigest()
+
+def persistent_storage_available():
+    return (
+        get_deployment_mode() != "render"
+        or (
+            os.environ.get("PERSISTENT_STORAGE", "").lower() == "true"
+            and DATA_DIR.is_mount()
+        )
+    )
+
+
+def api_error(message, status):
+    return jsonify({"error": message}), status
+
 
 @api.before_app_request
-def ensure_db():
-    init_db()
+def protect_api():
+    if not request.path.startswith("/api/"):
+        return None
+    if request.path in PUBLIC_ENDPOINTS:
+        return None
+    if not auth_required():
+        return None
+    if not admin_auth_configured():
+        return api_error("The control plane is not configured. Set ADMIN_EMAIL and ADMIN_PASSWORD.", 503)
+    if (
+        not session.get("authenticated")
+        or not hmac.compare_digest(session.get("auth_version", ""), admin_auth_version())
+    ):
+        return api_error("Authentication required.", 401)
+    if request.method in WRITE_METHODS:
+        supplied = request.headers.get("X-CSRF-Token", "")
+        expected = session.get("csrf_token", "")
+        if not supplied or not expected or not hmac.compare_digest(supplied, expected):
+            return api_error("CSRF validation failed. Refresh the page and try again.", 403)
+    return None
+
 
 @api.route("/health")
 def health():
-    return jsonify({"status": "ok", "mode": "local-pc"})
+    mode = get_deployment_mode()
+    conn = get_db()
+    try:
+        conn.execute("SELECT 1").fetchone()
+    except Exception:
+        current_app.logger.exception("Database health check failed.")
+        return api_error("Control-plane database is unavailable.", 503)
+    finally:
+        conn.close()
+    return jsonify({
+        "status": "ok",
+        "mode": mode,
+        "storage": "persistent" if persistent_storage_available() else "ephemeral",
+        "auth_configured": not auth_required() or admin_auth_configured(),
+        "database": "available",
+    })
 
-@api.route("/auth/login", methods=["POST"])
-def login():
-    data = request.get_json() or {}
-    email = data.get("email", "local@pc")
-    secret = data.get("secret", "")
-    if secret and secret != LOCAL_SECRET:
-        return jsonify({"error": "Invalid secret"}), 401
-    session["user_id"] = 1
-    session["email"] = email
-    return jsonify({"ok": True, "user": {"id": 1, "email": email}})
 
 @api.route("/auth/me")
 def me():
-    if not session.get("user_id"):
-        return jsonify({"authenticated": False})
-    return jsonify({"authenticated": True, "email": session.get("email")})
+    if not auth_required():
+        return jsonify({
+            "authenticated": True,
+            "email": "local@pc",
+            "mode": "local-pc",
+            "csrf_token": None,
+            "auth_required": False,
+        })
+    if not admin_auth_configured():
+        return jsonify({
+            "authenticated": False,
+            "mode": get_deployment_mode(),
+            "auth_required": True,
+            "configuration_error": "Set ADMIN_EMAIL and an ADMIN_PASSWORD with at least 16 characters to enable the protected control plane.",
+        }), 503
+    if (
+        not session.get("authenticated")
+        or not hmac.compare_digest(session.get("auth_version", ""), admin_auth_version())
+    ):
+        return jsonify({"authenticated": False, "mode": get_deployment_mode(), "auth_required": True})
+    return jsonify({
+        "authenticated": True,
+        "email": session.get("email"),
+        "mode": get_deployment_mode(),
+        "auth_required": True,
+        "csrf_token": session.get("csrf_token"),
+    })
+
+
+@api.route("/auth/login", methods=["POST"])
+def login():
+    if not auth_required():
+        return jsonify({"authenticated": True, "mode": "local-pc", "auth_required": False})
+    if not admin_auth_configured():
+        return api_error("Set ADMIN_EMAIL and an ADMIN_PASSWORD with at least 16 characters in the service environment before signing in.", 503)
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict):
+        return api_error("Send a JSON object with email and password.", 400)
+    email = data.get("email", "")
+    password = data.get("password", "")
+    configured_email = os.environ["ADMIN_EMAIL"]
+    configured_password = os.environ["ADMIN_PASSWORD"]
+    if not isinstance(email, str) or not isinstance(password, str):
+        return api_error("Email and password must be strings.", 400)
+
+    client_ip = request.remote_addr or "unknown"
+    client_key = hmac.new(
+        str(current_app.secret_key).encode(),
+        client_ip.encode(),
+        hashlib.sha256,
+    ).hexdigest()
+    conn = get_db()
+    try:
+        now = datetime.now(timezone.utc)
+        cutoff = (now - timedelta(minutes=15)).isoformat()
+        conn.execute("BEGIN IMMEDIATE")
+        conn.execute("DELETE FROM auth_login_attempts WHERE attempted_at < ?", (cutoff,))
+        attempts = conn.execute(
+            "SELECT COUNT(*) AS count FROM auth_login_attempts WHERE client_key = ?",
+            (client_key,),
+        ).fetchone()["count"]
+        if attempts >= 5:
+            conn.commit()
+            return api_error("Too many sign-in attempts. Try again in 15 minutes.", 429)
+        email_matches = hmac.compare_digest(email.strip().casefold(), configured_email.strip().casefold())
+        password_matches = hmac.compare_digest(password, configured_password)
+        if not (email_matches and password_matches):
+            conn.execute(
+                "INSERT INTO auth_login_attempts (client_key, attempted_at) VALUES (?, ?)",
+                (client_key, now.isoformat()),
+            )
+            conn.commit()
+            return api_error("Invalid email or password.", 401)
+        conn.execute("DELETE FROM auth_login_attempts WHERE client_key = ?", (client_key,))
+        conn.commit()
+    finally:
+        conn.close()
+
+    session.clear()
+    session.permanent = True
+    session["authenticated"] = True
+    session["email"] = configured_email
+    session["auth_version"] = admin_auth_version()
+    session["csrf_token"] = uuid.uuid4().hex
+    return jsonify({
+        "authenticated": True,
+        "email": configured_email,
+        "mode": get_deployment_mode(),
+        "auth_required": True,
+        "csrf_token": session["csrf_token"],
+    })
+
+
+@api.route("/auth/logout", methods=["POST"])
+def logout():
+    session.clear()
+    return jsonify({"authenticated": True})
+
 
 @api.route("/status")
 def status():
-    docker_info = docker_worker.get_docker_info()
+    mode = get_deployment_mode()
     conn = get_db()
-    worker = dict_from_row(conn.execute("SELECT * FROM workers WHERE id = 1").fetchone())
-    projects = conn.execute("SELECT COUNT(*) as c FROM projects").fetchone()["c"]
-    plan = get_plan(1)
-    usage = get_user_usage(1)
-    conn.close()
-    return jsonify({
-        "worker": worker,
-        "docker": docker_info,
-        "projects": projects,
-        "plan": plan,
-        "usage": usage,
-        "mode": "Local PC"
-    })
+    try:
+        worker = dict_from_row(conn.execute("SELECT * FROM workers WHERE id = 1").fetchone())
+        if mode == "render":
+            worker = {
+                "name": "No worker enrolled",
+                "status": "unavailable",
+                "total_ram_mb": None,
+                "reserved_ram_mb": None,
+                "total_cpu": None,
+                "reserved_cpu": None,
+                "total_storage_mb": None,
+                "reserved_storage_mb": None,
+                "last_seen": None,
+            }
+        projects = conn.execute("SELECT COUNT(*) AS c FROM projects WHERE user_id = 1").fetchone()["c"]
+        plan = get_plan(1, conn)
+        usage = get_user_usage(1, conn)
+        return jsonify({
+            "worker": worker,
+            "docker": docker_worker.get_docker_info() if mode != "render" else {"available": False},
+            "projects": projects,
+            "plan": plan,
+            "usage": usage,
+            "mode": mode,
+            "storage": "persistent" if persistent_storage_available() else "ephemeral",
+        })
+    finally:
+        conn.close()
+
 
 @api.route("/templates")
 def templates():
     return jsonify(list_templates())
 
+
 @api.route("/plans")
-def list_plans():
+def list_plans_route():
     conn = get_db()
-    rows = conn.execute("SELECT * FROM plans").fetchall()
-    conn.close()
-    return jsonify([dict(r) for r in rows])
+    try:
+        rows = conn.execute("SELECT * FROM plans ORDER BY id").fetchall()
+        return jsonify([dict(row) for row in rows])
+    finally:
+        conn.close()
+
 
 @api.route("/projects", methods=["GET"])
 def list_projects():
     conn = get_db()
-    rows = conn.execute("SELECT * FROM projects ORDER BY created_at DESC").fetchall()
-    conn.close()
-    return jsonify([dict(r) for r in rows])
+    try:
+        rows = conn.execute(
+            "SELECT id, name, type, status, ram_mb, cpu_limit, storage_mb, created_at "
+            "FROM projects WHERE user_id = 1 ORDER BY created_at DESC, id DESC"
+        ).fetchall()
+        return jsonify([dict(row) for row in rows])
+    finally:
+        conn.close()
+
 
 @api.route("/projects", methods=["POST"])
 def create_project():
-    data = request.get_json() or {}
-    name = data.get("name", "untitled").replace(" ", "-").lower()
-    ptype = data.get("type", "python")
-    ram_mb = int(data.get("ram_mb", 512))
-    storage_mb = int(data.get("storage_mb", 1024))
-    zip_filename = data.get("zip_filename")
+    if get_deployment_mode() == "render":
+        return api_error("No worker is enrolled with this Render control plane. Deployments are unavailable.", 503)
+
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict):
+        return api_error("Send a JSON object describing the deployment.", 400)
+    name = data.get("name", "")
+    ptype = data.get("type", "")
+    if not isinstance(name, str) or not PROJECT_NAME.fullmatch(name.strip()):
+        return api_error("Project name must be 1–48 characters and use letters, numbers, dots, underscores, or hyphens.", 400)
+    if not isinstance(ptype, str) or not get_template(ptype):
+        return api_error("Choose a supported deployment template.", 400)
+
+    raw_ram = data.get("ram_mb", 512)
+    raw_storage = data.get("storage_mb", 1024)
+    raw_cpu = data.get("cpu_limit", 0)
+    if type(raw_ram) is not int or type(raw_storage) is not int or isinstance(raw_cpu, bool):
+        return api_error("RAM and storage allocations must be whole numbers.", 400)
+    try:
+        ram_mb = raw_ram
+        storage_mb = raw_storage
+        requested_cpu = float(data.get("cpu_limit", 0))
+    except (TypeError, ValueError, OverflowError):
+        return api_error("RAM and storage must be whole numbers and CPU must be a number.", 400)
+    if not math.isfinite(requested_cpu) or requested_cpu < 0:
+        return api_error("CPU allocation is invalid.", 400)
+    if ram_mb < 64 or storage_mb < 1:
+        return api_error("RAM must be at least 64 MB and storage must be positive.", 400)
 
     tpl = get_template(ptype)
     image = data.get("image") or tpl["image"]
     command = data.get("command") or tpl.get("command")
-    env = tpl.get("env", {})
-
-    plan = get_plan(1)
-    usage = get_user_usage(1)
-
-    if usage["deployments"] >= plan["max_deployments"]:
-        return jsonify({"error": f"Plan limit: max {plan['max_deployments']} deployments"}), 400
-    if ram_mb > plan["ram_mb"]:
-        return jsonify({"error": f"Plan limit: max {plan['ram_mb']} MB RAM"}), 400
+    if not isinstance(image, str) or not image.strip() or len(image) > 256:
+        return api_error("Container image is invalid.", 400)
+    if command is not None and (not isinstance(command, str) or len(command) > 2048):
+        return api_error("Container command is invalid.", 400)
 
     conn = get_db()
-    worker = conn.execute("SELECT * FROM workers WHERE id = 1").fetchone()
-    if ram_mb > (worker["total_ram_mb"] - worker["reserved_ram_mb"]):
+    volume_path = None
+    reserved = False
+    container_id = None
+    try:
+        conn.execute("BEGIN IMMEDIATE")
+        plan = get_plan(1, conn)
+        if not plan:
+            return api_error("No plan is configured for this account.", 503)
+        usage = get_user_usage(1, conn)
+        if usage["deployments"] >= plan["max_deployments"]:
+            return api_error(f"Plan limit: max {plan['max_deployments']} running deployments.", 400)
+        if ram_mb > plan["ram_mb"]:
+            return api_error(f"Plan limit: max {plan['ram_mb']} MB RAM.", 400)
+        if storage_mb > plan["storage_mb"]:
+            return api_error(f"Plan limit: max {plan['storage_mb']} MB storage.", 400)
+        if requested_cpu and requested_cpu > plan["cpu_limit"]:
+            return api_error(f"Plan limit: max {plan['cpu_limit']} CPU cores.", 400)
+        cpu_allocation = requested_cpu or float(plan["cpu_limit"])
+
+        worker_row = conn.execute("SELECT * FROM workers WHERE id = 1").fetchone()
+        worker = dict_from_row(worker_row)
+        if not worker or worker["status"] != "healthy":
+            return api_error("No healthy local worker is available.", 503)
+        if ram_mb > worker["total_ram_mb"] - worker["reserved_ram_mb"]:
+            return api_error("Not enough unreserved RAM on the local worker.", 409)
+        if cpu_allocation > worker["total_cpu"] - worker["reserved_cpu"]:
+            return api_error("Not enough unreserved CPU capacity on the local worker.", 409)
+        if storage_mb > worker["total_storage_mb"] - worker["reserved_storage_mb"]:
+            return api_error("Not enough unreserved storage on the local worker.", 409)
+        if storage_mb * 1024 * 1024 > shutil.disk_usage(DATA_DIR).free:
+            return api_error("Not enough free disk space on the local worker.", 409)
+
+        conn.execute(
+            "UPDATE workers SET reserved_ram_mb = reserved_ram_mb + ?, reserved_cpu = reserved_cpu + ?, "
+            "reserved_storage_mb = reserved_storage_mb + ? WHERE id = 1",
+            (ram_mb, cpu_allocation, storage_mb),
+        )
+        conn.commit()
+        reserved = True
+
+        volume_path = str(VOLUMES_DIR / uuid.uuid4().hex)
+        Path(volume_path).mkdir(parents=True, exist_ok=False)
+        result = docker_worker.run_container(
+            image=image.strip(),
+            name=f"hosting-{uuid.uuid4().hex[:20]}",
+            ram_mb=ram_mb,
+            cpu_limit=cpu_allocation,
+            volume_path=volume_path,
+            command=command,
+            env=tpl.get("env", {}),
+        )
+        if "error" in result:
+            conn.execute("BEGIN IMMEDIATE")
+            conn.execute(
+                "UPDATE workers SET reserved_ram_mb = MAX(0, reserved_ram_mb - ?), "
+                "reserved_cpu = MAX(0, reserved_cpu - ?), "
+                "reserved_storage_mb = MAX(0, reserved_storage_mb - ?) WHERE id = 1",
+                (ram_mb, cpu_allocation, storage_mb),
+            )
+            conn.commit()
+            reserved = False
+            shutil.rmtree(volume_path, ignore_errors=True)
+            return api_error(result["error"], 502)
+
+        container_id = result.get("id")
+        now = datetime.now(timezone.utc).isoformat()
+        cursor = conn.execute(
+            """INSERT INTO projects
+               (user_id, name, type, status, ram_mb, storage_mb, cpu_limit, container_id, volume_path, created_at)
+               VALUES (1, ?, ?, 'running', ?, ?, ?, ?, ?, ?)""",
+            (name.strip(), ptype, ram_mb, storage_mb, cpu_allocation, result.get("id"), volume_path, now),
+        )
+        conn.commit()
+        return jsonify({
+            "id": cursor.lastrowid,
+            "status": "running",
+            "container": result,
+            "template": tpl["name"],
+        }), 201
+    except Exception:
+        if conn.in_transaction:
+            conn.rollback()
+        if container_id:
+            cleanup = docker_worker.remove_container(container_id)
+            if "error" in cleanup:
+                current_app.logger.error("Failed to remove orphaned container %s: %s", container_id, cleanup["error"])
+        if reserved:
+            conn.execute("BEGIN IMMEDIATE")
+            conn.execute(
+                "UPDATE workers SET reserved_ram_mb = MAX(0, reserved_ram_mb - ?), "
+                "reserved_cpu = MAX(0, reserved_cpu - ?), "
+                "reserved_storage_mb = MAX(0, reserved_storage_mb - ?) WHERE id = 1",
+                (ram_mb, cpu_allocation, storage_mb),
+            )
+            conn.commit()
+        if volume_path:
+            shutil.rmtree(volume_path, ignore_errors=True)
+        raise
+    finally:
         conn.close()
-        return jsonify({"error": "Not enough capacity on local worker"}), 400
 
-    volume_path = str(VOLUMES_DIR / f"{name}-{int(datetime.utcnow().timestamp())}")
-    os.makedirs(volume_path, exist_ok=True)
 
-    if zip_filename:
-        zip_path = UPLOADS_DIR / zip_filename
-        if zip_path.exists():
-            try:
-                with zipfile.ZipFile(zip_path, "r") as z:
-                    z.extractall(volume_path)
-            except Exception as e:
-                conn.close()
-                return jsonify({"error": f"ZIP failed: {e}"}), 400
+def get_project(conn, project_id):
+    return dict_from_row(conn.execute(
+        "SELECT * FROM projects WHERE id = ? AND user_id = 1", (project_id,)
+    ).fetchone())
 
-    result = docker_worker.run_container(
-        image=image,
-        name=f"hosting-{name}-{int(datetime.utcnow().timestamp())}",
-        ram_mb=ram_mb,
-        volume_path=volume_path,
-        command=command,
-        env=env,
-    )
-
-    if "error" in result:
-        conn.close()
-        return jsonify(result), 400
-
-    c = conn.cursor()
-    c.execute(
-        """INSERT INTO projects (user_id, name, type, status, ram_mb, storage_mb, container_id, volume_path, created_at)
-           VALUES (1, ?, ?, 'running', ?, ?, ?, ?, ?)""",
-        (name, ptype, ram_mb, storage_mb, result.get("id"), volume_path, datetime.utcnow().isoformat()),
-    )
-    c.execute(
-        "UPDATE workers SET reserved_ram_mb = reserved_ram_mb + ?, reserved_storage_mb = reserved_storage_mb + ? WHERE id = 1",
-        (ram_mb, storage_mb),
-    )
-    conn.commit()
-    pid = c.lastrowid
-    conn.close()
-
-    return jsonify({"id": pid, "status": "running", "container": result, "template": tpl["name"]})
 
 @api.route("/projects/<int:pid>/stop", methods=["POST"])
 def stop_project(pid):
     conn = get_db()
-    proj = dict_from_row(conn.execute("SELECT * FROM projects WHERE id = ?", (pid,)).fetchone())
-    if not proj:
+    try:
+        conn.execute("BEGIN IMMEDIATE")
+        project = get_project(conn, pid)
+        if not project:
+            return api_error("Project not found.", 404)
+        if project["status"] != "running":
+            return jsonify({"status": project["status"]})
+        result = docker_worker.stop_container(project["container_id"])
+        if "error" in result:
+            return api_error(result["error"], 502)
+        conn.execute("UPDATE projects SET status = 'stopped' WHERE id = ?", (pid,))
+        conn.execute(
+            "UPDATE workers SET reserved_ram_mb = MAX(0, reserved_ram_mb - ?), "
+            "reserved_cpu = MAX(0, reserved_cpu - ?), "
+            "reserved_storage_mb = MAX(0, reserved_storage_mb - ?) WHERE id = 1",
+            (project["ram_mb"], project["cpu_limit"], project["storage_mb"]),
+        )
+        conn.commit()
+        return jsonify({"status": "stopped"})
+    finally:
         conn.close()
-        return jsonify({"error": "Not found"}), 404
-    if proj.get("container_id"):
-        docker_worker.stop_container(proj["container_id"])
-    conn.execute("UPDATE projects SET status = 'stopped' WHERE id = ?", (pid,))
-    conn.execute(
-        "UPDATE workers SET reserved_ram_mb = MAX(0, reserved_ram_mb - ?), reserved_storage_mb = MAX(0, reserved_storage_mb - ?) WHERE id = 1",
-        (proj["ram_mb"], proj["storage_mb"]),
-    )
-    conn.commit()
-    conn.close()
-    return jsonify({"status": "stopped"})
+
 
 @api.route("/projects/<int:pid>/start", methods=["POST"])
 def start_project(pid):
     conn = get_db()
-    proj = dict_from_row(conn.execute("SELECT * FROM projects WHERE id = ?", (pid,)).fetchone())
-    if not proj:
-        conn.close()
-        return jsonify({"error": "Not found"}), 404
-    client = docker_worker.get_client()
-    if client and proj.get("container_id"):
+    try:
+        conn.execute("BEGIN IMMEDIATE")
+        project = get_project(conn, pid)
+        if not project:
+            return api_error("Project not found.", 404)
+        if project["status"] == "running":
+            return jsonify({"status": "running"})
+        worker = dict_from_row(conn.execute("SELECT * FROM workers WHERE id = 1").fetchone())
+        if not worker or worker["status"] != "healthy":
+            return api_error("No healthy local worker is available.", 503)
+        if project["ram_mb"] > worker["total_ram_mb"] - worker["reserved_ram_mb"]:
+            return api_error("Not enough unreserved RAM on the local worker.", 409)
+        if project["cpu_limit"] > worker["total_cpu"] - worker["reserved_cpu"]:
+            return api_error("Not enough unreserved CPU capacity on the local worker.", 409)
+        if project["storage_mb"] > worker["total_storage_mb"] - worker["reserved_storage_mb"]:
+            return api_error("Not enough unreserved storage on the local worker.", 409)
+        client = docker_worker.get_client()
+        if not client:
+            return api_error("Docker is unavailable; the project was not started.", 503)
         try:
-            c = client.containers.get(proj["container_id"])
-            c.start()
-        except Exception as e:
-            conn.close()
-            return jsonify({"error": str(e)}), 400
-    conn.execute("UPDATE projects SET status = 'running' WHERE id = ?", (pid,))
-    conn.execute(
-        "UPDATE workers SET reserved_ram_mb = reserved_ram_mb + ?, reserved_storage_mb = reserved_storage_mb + ? WHERE id = 1",
-        (proj["ram_mb"], proj["storage_mb"]),
-    )
-    conn.commit()
-    conn.close()
-    return jsonify({"status": "running"})
+            container = client.containers.get(project["container_id"])
+            container.start()
+        except Exception as error:
+            return api_error(f"Container could not be started: {error}", 502)
+        conn.execute(
+            "UPDATE workers SET reserved_ram_mb = reserved_ram_mb + ?, reserved_cpu = reserved_cpu + ?, "
+            "reserved_storage_mb = reserved_storage_mb + ? WHERE id = 1",
+            (project["ram_mb"], project["cpu_limit"], project["storage_mb"]),
+        )
+        conn.execute("UPDATE projects SET status = 'running' WHERE id = ?", (pid,))
+        conn.commit()
+        return jsonify({"status": "running"})
+    finally:
+        conn.close()
+
 
 @api.route("/projects/<int:pid>/logs")
 def project_logs(pid):
     conn = get_db()
-    proj = dict_from_row(conn.execute("SELECT * FROM projects WHERE id = ?", (pid,)).fetchone())
-    conn.close()
-    if not proj or not proj.get("container_id"):
-        return jsonify({"logs": "No container"})
+    try:
+        project = get_project(conn, pid)
+    finally:
+        conn.close()
+    if not project:
+        return api_error("Project not found.", 404)
+    if not project.get("container_id"):
+        return jsonify({"logs": "No container is associated with this project."})
     client = docker_worker.get_client()
     if not client:
-        return jsonify({"logs": "Docker unavailable"})
+        return api_error("Docker is unavailable.", 503)
     try:
-        c = client.containers.get(proj["container_id"])
-        logs = c.logs(tail=150).decode("utf-8", errors="replace")
-        return jsonify({"logs": logs or "(empty)"})
-    except Exception as e:
-        return jsonify({"logs": str(e)})
+        container = client.containers.get(project["container_id"])
+        logs = container.logs(tail=200).decode("utf-8", errors="replace")
+        return jsonify({"logs": logs})
+    except Exception:
+        return api_error("Could not retrieve container logs.", 502)
+
 
 @api.route("/projects/<int:pid>", methods=["DELETE"])
 def delete_project(pid):
     conn = get_db()
-    proj = dict_from_row(conn.execute("SELECT * FROM projects WHERE id = ?", (pid,)).fetchone())
-    if not proj:
+    try:
+        conn.execute("BEGIN IMMEDIATE")
+        project = get_project(conn, pid)
+        if not project:
+            return api_error("Project not found.", 404)
+        if project.get("container_id"):
+            result = docker_worker.remove_container(project["container_id"])
+            if "error" in result:
+                return api_error(result["error"], 502)
+        volume = Path(project["volume_path"]).resolve() if project.get("volume_path") else None
+        volumes_root = VOLUMES_DIR.resolve()
+        if volume and not volume.is_relative_to(volumes_root):
+            return api_error("Project volume path is outside the managed storage root.", 500)
+        if volume and volume.exists():
+            shutil.rmtree(volume)
+        conn.execute("DELETE FROM projects WHERE id = ?", (pid,))
+        if project["status"] == "running":
+            conn.execute(
+                "UPDATE workers SET reserved_ram_mb = MAX(0, reserved_ram_mb - ?), "
+                "reserved_cpu = MAX(0, reserved_cpu - ?), "
+                "reserved_storage_mb = MAX(0, reserved_storage_mb - ?) WHERE id = 1",
+                (project["ram_mb"], project["cpu_limit"], project["storage_mb"]),
+            )
+        conn.commit()
+        return jsonify({"status": "deleted"})
+    finally:
         conn.close()
-        return jsonify({"error": "Not found"}), 404
-    if proj.get("container_id"):
-        docker_worker.remove_container(proj["container_id"])
-    if proj.get("volume_path") and os.path.exists(proj["volume_path"]):
-        shutil.rmtree(proj["volume_path"], ignore_errors=True)
-    conn.execute("DELETE FROM projects WHERE id = ?", (pid,))
-    if proj["status"] == "running":
-        conn.execute(
-            "UPDATE workers SET reserved_ram_mb = MAX(0, reserved_ram_mb - ?), reserved_storage_mb = MAX(0, reserved_storage_mb - ?) WHERE id = 1",
-            (proj["ram_mb"], proj["storage_mb"]),
-        )
-    conn.commit()
-    conn.close()
-    return jsonify({"status": "deleted"})
+
 
 @api.route("/docker/containers")
 def docker_containers():
-    return jsonify(docker_worker.list_containers())
+    if get_deployment_mode() == "render":
+        return api_error("No worker is enrolled with this Render control plane.", 503)
+    containers = docker_worker.list_containers()
+    if isinstance(containers, dict) and "error" in containers:
+        return api_error(containers["error"], 503)
+    return jsonify(containers)
+
 
 @api.route("/upload", methods=["POST"])
 def upload_file():
-    if "file" not in request.files:
-        return jsonify({"error": "No file"}), 400
-    f = request.files["file"]
-    if not f.filename:
-        return jsonify({"error": "Empty"}), 400
-    safe = f"{int(datetime.utcnow().timestamp())}_{f.filename}"
-    path = UPLOADS_DIR / safe
-    f.save(path)
-    return jsonify({"filename": safe})
+    if get_deployment_mode() == "render":
+        return api_error("Uploads are unavailable until persistent worker storage is configured.", 503)
+    uploaded_file = request.files.get("file")
+    if not uploaded_file or not uploaded_file.filename:
+        return api_error("Choose a file to upload.", 400)
+    filename = secure_filename(uploaded_file.filename)
+    if not filename:
+        return api_error("The filename is invalid.", 400)
+    unique_name = f"{uuid.uuid4().hex}_{filename}"
+    path = UPLOADS_DIR / unique_name
+    uploaded_file.save(path)
+    return jsonify({"filename": unique_name}), 201
+
 
 @api.route("/admin/stats")
 def admin_stats():
     conn = get_db()
-    total_projects = conn.execute("SELECT COUNT(*) as c FROM projects").fetchone()["c"]
-    running = conn.execute("SELECT COUNT(*) as c FROM projects WHERE status='running'").fetchone()["c"]
-    worker = dict_from_row(conn.execute("SELECT * FROM workers WHERE id=1").fetchone())
-    conn.close()
+    try:
+        total_projects = conn.execute("SELECT COUNT(*) AS c FROM projects").fetchone()["c"]
+        running = conn.execute("SELECT COUNT(*) AS c FROM projects WHERE status = 'running'").fetchone()["c"]
+        worker = dict_from_row(conn.execute("SELECT * FROM workers WHERE id = 1").fetchone())
+    finally:
+        conn.close()
     return jsonify({
         "total_projects": total_projects,
         "running": running,
-        "worker": worker,
-        "docker": docker_worker.get_docker_info()
+        "worker": worker if get_deployment_mode() != "render" else None,
+        "docker": docker_worker.get_docker_info() if get_deployment_mode() != "render" else {"available": False},
     })

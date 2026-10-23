@@ -2,8 +2,17 @@ services:
   - type: web
     name: hosting-web
     env: python
-    buildCommand: pip install -r requirements.txt && (cd frontend && npm install && npm run build || echo "Frontend build skipped")
-    startCommand: python hosting.py
+    buildCommand: pip install -r requirements.txt && (cd frontend && npm ci && npm run build)
+    startCommand: gunicorn --bind 0.0.0.0:$PORT --workers 1 --threads 4 --timeout 120 hosting:app
+    healthCheckPath: /api/health
     envVars:
-      - key: PORT
-        value: 10000
+      - key: SECRET_KEY
+        generateValue: true
+      - key: ADMIN_EMAIL
+        sync: false
+      - key: ADMIN_PASSWORD
+        sync: false
+      - key: DATA_DIR
+        value: /opt/render/project/src/data
+      - key: PERSISTENT_STORAGE
+        sync: false

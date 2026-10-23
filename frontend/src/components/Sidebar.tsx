@@ -1,111 +1,149 @@
-import { NavLink } from 'react-router-dom'
+import { Link, useLocation } from 'react-router-dom'
+import { useEffect, useState } from 'react'
 import {
+  Activity,
+  Box,
+  Cloud,
+  Code2,
+  CreditCard,
+  FolderKanban,
+  Globe2,
   LayoutDashboard,
   Server,
-  FolderOpen,
-  Activity,
-  CreditCard,
-  Settings,
-  Box,
-  Code,
-  Globe,
-  Gamepad2,
+  Settings2,
   Terminal,
   X,
-  Cloud,
 } from 'lucide-react'
 import { cn } from '../lib/utils'
 
-const navItems = [
+const groups = [
   {
-    section: 'Overview',
-    items: [{ to: '/', icon: LayoutDashboard, label: 'Dashboard' }],
+    label: 'Workspace',
+    items: [{ to: '/', label: 'Overview', icon: LayoutDashboard }],
   },
   {
-    section: 'Deploy',
+    label: 'Build & deploy',
     items: [
-      { to: '/deploy?type=minecraft', icon: Gamepad2, label: 'Minecraft' },
-      { to: '/deploy?type=python', icon: Code, label: 'Python' },
-      { to: '/deploy?type=nodejs', icon: Terminal, label: 'Node.js' },
-      { to: '/deploy?type=website', icon: Globe, label: 'Websites' },
-      { to: '/deploy?type=docker', icon: Box, label: 'Docker' },
+      { to: '/projects', label: 'Projects', icon: FolderKanban },
+      { to: '/deploy?type=website', label: 'Websites', icon: Globe2 },
+      { to: '/deploy?type=nodejs', label: 'Node.js', icon: Terminal },
+      { to: '/deploy?type=python', label: 'Python', icon: Code2 },
+      { to: '/deploy?type=docker', label: 'Docker', icon: Box },
+      { to: '/deploy?type=minecraft', label: 'Game servers', icon: Activity },
     ],
   },
   {
-    section: 'Manage',
+    label: 'Infrastructure',
     items: [
-      { to: '/projects', icon: FolderOpen, label: 'Projects' },
-      { to: '/servers', icon: Server, label: 'Servers' },
-      { to: '/monitoring', icon: Activity, label: 'Monitoring' },
+      { to: '/servers', label: 'Workers', icon: Server },
+      { to: '/monitoring', label: 'Monitoring', icon: Activity },
     ],
   },
   {
-    section: 'Account',
+    label: 'Account',
     items: [
-      { to: '/billing', icon: CreditCard, label: 'Billing' },
-      { to: '/settings', icon: Settings, label: 'Settings' },
+      { to: '/billing', label: 'Plans & billing', icon: CreditCard },
+      { to: '/settings', label: 'Settings', icon: Settings2 },
     ],
   },
 ]
 
 export default function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
+  const location = useLocation()
+  const [mode, setMode] = useState('local-pc')
+
+  useEffect(() => {
+    fetch('/api/health')
+      .then((response) => response.ok ? response.json() : Promise.reject(new Error('Health request failed')))
+      .then((data) => setMode(data.mode || 'local-pc'))
+      .catch(() => setMode('unavailable'))
+  }, [])
+
+  const isRender = mode === 'render'
+
   return (
-    <aside className="h-full w-64 bg-card border-r flex flex-col">
-      <div className="p-5 flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <div className="h-9 w-9 rounded-xl bg-primary flex items-center justify-center shadow-sm">
-            <Cloud className="h-5 w-5 text-white" />
-          </div>
-          <div>
-            <h1 className="font-semibold text-sm">Cloud Host</h1>
-            <p className="text-[11px] text-muted-foreground">Local PC</p>
-          </div>
-        </div>
+    <aside className="sidebar flex h-full w-[264px] flex-col border-r border-border">
+      <div className="flex h-[72px] shrink-0 items-center justify-between border-b border-border px-5">
+        <Link to="/" onClick={onNavigate} className="flex min-w-0 items-center gap-3">
+          <span className="brand-mark flex h-9 w-9 shrink-0 items-center justify-center rounded-xl">
+            <Cloud className="h-[18px] w-[18px] text-white" strokeWidth={2.2} />
+          </span>
+          <span className="min-w-0">
+            <span className="block truncate text-[14px] font-semibold tracking-[-0.02em]">Cloud Host</span>
+            <span className="mt-0.5 block text-[10px] font-medium uppercase tracking-[0.14em] text-muted-foreground">Control plane</span>
+          </span>
+        </Link>
         <button
+          type="button"
           onClick={onNavigate}
-          className="lg:hidden p-1.5 rounded-lg hover:bg-accent"
+          aria-label="Close navigation"
+          className="icon-button lg:hidden"
         >
           <X className="h-4 w-4" />
         </button>
       </div>
 
-      <nav className="flex-1 overflow-y-auto px-3 pb-4 space-y-6">
-        {navItems.map((group) => (
-          <div key={group.section}>
-            <h3 className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider mb-2 px-3">
-              {group.section}
-            </h3>
-            <div className="space-y-0.5">
-              {group.items.map((item) => (
-                <NavLink
-                  key={item.to}
-                  to={item.to}
-                  onClick={onNavigate}
-                  className={({ isActive }) =>
-                    cn(
-                      'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-all',
-                      isActive
-                        ? 'bg-primary text-white shadow-sm'
-                        : 'text-muted-foreground hover:text-foreground hover:bg-accent'
-                    )
-                  }
-                >
-                  <item.icon className="h-4 w-4" />
-                  {item.label}
-                </NavLink>
-              ))}
+      <div className="px-3 pt-4">
+        <div className="workspace-switcher flex items-center gap-3 rounded-xl border border-border/80 px-3 py-2.5">
+          <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10 text-primary">
+            <Cloud className="h-4 w-4" />
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="block truncate text-xs font-semibold">Personal workspace</span>
+            <span className="mt-0.5 block text-[10px] text-muted-foreground">
+              {isRender ? 'Render environment' : mode === 'unavailable' ? 'Connection unavailable' : 'Local environment'}
+            </span>
+          </span>
+        </div>
+      </div>
+
+      <nav aria-label="Main navigation" className="min-h-0 flex-1 space-y-6 overflow-y-auto px-3 py-6">
+        {groups.map((group) => (
+          <section key={group.label}>
+            <h2 className="nav-section-label mb-2 px-3">{group.label}</h2>
+            <div className="space-y-1">
+              {group.items.map((item) => {
+                const [path, query] = item.to.split('?')
+                const active =
+                  location.pathname === path &&
+                  (query ? location.search === `?${query}` : path === '/' || !location.search)
+                return (
+                  <Link
+                    key={item.to}
+                    to={item.to}
+                    onClick={onNavigate}
+                    aria-current={active ? 'page' : undefined}
+                    className={cn(
+                      'nav-link group flex items-center gap-3 rounded-lg px-3 py-[9px] text-[13px] font-medium transition-colors',
+                      active
+                        ? 'nav-link-active'
+                        : 'text-muted-foreground hover:bg-accent/70 hover:text-foreground',
+                    )}
+                  >
+                    <item.icon className="h-[17px] w-[17px] shrink-0 opacity-80 group-hover:opacity-100" strokeWidth={1.8} />
+                    <span>{item.label}</span>
+                  </Link>
+                )
+              })}
             </div>
-          </div>
+          </section>
         ))}
       </nav>
 
-      <div className="p-3 mx-3 mb-4 rounded-xl bg-secondary/60">
-        <div className="flex items-center gap-2 text-xs">
-          <span className="relative flex h-2 w-2">
-            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75" />
-            <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500" />
-          </span>
-          <span className="text-muted-foreground">Worker healthy</span>
+      <div className="border-t border-border p-3">
+        <div className="rounded-xl border border-border/80 bg-background/50 p-3">
+          <div className="flex items-center gap-2">
+            <span className={`h-2 w-2 rounded-full ${mode === 'unavailable' ? 'bg-amber-400' : 'bg-cyan-400'}`} />
+            <span className="text-[11px] font-semibold">{isRender ? 'Render control plane' : mode === 'unavailable' ? 'API unavailable' : 'Local PC mode'}</span>
+          </div>
+          <p className="mt-1.5 pl-4 text-[10px] leading-relaxed text-muted-foreground">
+            {isRender ? 'Hosted dashboard. No worker is enrolled yet.' : 'Single-node environment. Public hosting is not configured.'}
+          </p>
+        </div>
+        <div className="mt-3 flex items-center gap-2 px-2 text-[10px] text-muted-foreground">
+          <span className="flex h-6 w-6 items-center justify-center rounded-full bg-secondary text-[9px] font-semibold text-foreground">LH</span>
+          <span>Local host</span>
+          <span className="ml-auto rounded-md border border-border px-1.5 py-0.5 font-mono text-[9px]">DEV</span>
         </div>
       </div>
     </aside>

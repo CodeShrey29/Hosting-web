@@ -25,8 +25,13 @@ export default function CommandPalette() {
       }
       if (e.key === 'Escape') setOpen(false)
     }
+    const openSearch = () => setOpen(true)
     window.addEventListener('keydown', handler)
-    return () => window.removeEventListener('keydown', handler)
+    window.addEventListener('cloud-host:open-search', openSearch)
+    return () => {
+      window.removeEventListener('keydown', handler)
+      window.removeEventListener('cloud-host:open-search', openSearch)
+    }
   }, [])
 
   const filtered = commands.filter((c) =>
@@ -36,15 +41,15 @@ export default function CommandPalette() {
   if (!open) return null
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/50 flex items-start justify-center pt-32">
-      <div className="w-full max-w-lg bg-card border rounded-lg shadow-xl">
+    <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/55 px-4 pt-[15vh] backdrop-blur-sm" onClick={() => setOpen(false)}>
+      <div className="command-panel w-full max-w-lg overflow-hidden rounded-xl border shadow-2xl" onClick={(event) => event.stopPropagation()}>
         <div className="flex items-center gap-2 p-3 border-b">
           <Search className="h-4 w-4 text-muted-foreground" />
           <input
             autoFocus
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Type a command..."
+            placeholder="Search pages and actions..."
             className="flex-1 bg-transparent outline-none text-sm"
           />
         </div>
@@ -57,7 +62,7 @@ export default function CommandPalette() {
                 setOpen(false)
                 setQuery('')
               }}
-              className="w-full text-left px-4 py-2.5 text-sm hover:bg-accent"
+              className="flex w-full items-center px-4 py-3 text-left text-sm transition-colors hover:bg-accent"
             >
               {cmd.label}
             </button>

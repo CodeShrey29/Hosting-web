@@ -1,0 +1,9 @@
+services:
+  - type: web
+    name: hosting-web
+    env: python
+    buildCommand: cd frontend && npm install && npm run build
+    startCommand: python hosting.py
+    envVars:
+      - key: PORT
+        value: 10000

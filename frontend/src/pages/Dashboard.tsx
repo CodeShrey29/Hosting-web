@@ -1,5 +1,17 @@
 import { useEffect, useState } from 'react'
-import { Activity, HardDrive, Cpu, Box, Plus, ArrowUpRight, Server } from 'lucide-react'
+import {
+  Activity,
+  HardDrive,
+  Cpu,
+  Box,
+  Plus,
+  ArrowUpRight,
+  Server,
+  Zap,
+  Clock,
+  TrendingUp,
+  ChevronRight,
+} from 'lucide-react'
 import { Link } from 'react-router-dom'
 
 export default function Dashboard() {
@@ -14,77 +26,182 @@ export default function Dashboard() {
   const docker = status?.docker || {}
   const plan = status?.plan || {}
   const usage = status?.usage || {}
+  const worker = status?.worker || {}
 
-  const cards = [
-    { label: 'RAM Used', value: `${usage.used_ram || 0}`, unit: 'MB', sub: `of ${plan.ram_mb || 512} MB`, icon: Activity, color: 'text-blue-500' },
-    { label: 'Deployments', value: usage.deployments || 0, unit: '', sub: `of ${plan.max_deployments || 3} max`, icon: Box, color: 'text-violet-500' },
-    { label: 'Docker', value: docker.available ? 'Ready' : 'Offline', unit: '', sub: `${docker.running || 0} running`, icon: Cpu, color: docker.available ? 'text-green-500' : 'text-red-500' },
-    { label: 'Storage', value: usage.used_storage || 0, unit: 'MB', sub: `of ${plan.storage_mb || 1024} MB`, icon: HardDrive, color: 'text-amber-500' },
-  ]
+  const ramPercent = Math.min(100, ((usage.used_ram || 0) / (plan.ram_mb || 512)) * 100)
+  const storagePercent = Math.min(100, ((usage.used_storage || 0) / (plan.storage_mb || 1024)) * 100)
 
   return (
-    <div className="space-y-6 max-w-6xl">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
+    <div className="space-y-8 max-w-7xl">
+      {/* Welcome */}
+      <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Dashboard</h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            {plan.name || 'Free'} plan · Local PC
+          <div className="flex items-center gap-2 text-sm text-muted-foreground mb-1">
+            <span className="h-1.5 w-1.5 rounded-full bg-green-500" />
+            System operational
+          </div>
+          <h1 className="text-3xl font-semibold tracking-tight">Good evening</h1>
+          <p className="text-muted-foreground mt-1">
+            {plan.name || 'Free'} plan · {usage.deployments || 0} active deployments
           </p>
         </div>
-        <Link
-          to="/deploy"
-          className="inline-flex items-center justify-center gap-2 bg-primary hover:bg-primary/90 text-white px-4 py-2.5 rounded-lg text-sm font-medium transition-colors shadow-sm"
-        >
-          <Plus className="h-4 w-4" />
-          New Deployment
-        </Link>
+        <div className="flex gap-2">
+          <Link
+            to="/projects"
+            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg border text-sm font-medium hover:bg-accent transition-colors"
+          >
+            View projects
+          </Link>
+          <Link
+            to="/deploy"
+            className="inline-flex items-center gap-2 bg-primary text-white px-4 py-2.5 rounded-lg text-sm font-medium hover:bg-primary/90 transition-colors"
+          >
+            <Plus className="h-4 w-4" />
+            Deploy
+          </Link>
+        </div>
       </div>
 
-      {/* Metric cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        {cards.map((c) => (
-          <div key={c.label} className="bg-card border rounded-xl p-4 hover:shadow-sm transition-shadow">
-            <div className="flex items-center justify-between mb-3">
-              <span className="text-xs font-medium text-muted-foreground">{c.label}</span>
-              <c.icon className={`h-4 w-4 ${c.color}`} />
+      {/* Primary metrics */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        {/* RAM */}
+        <div className="bg-card border rounded-2xl p-5">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
+              <div className="h-8 w-8 rounded-lg bg-blue-500/10 flex items-center justify-center">
+                <Activity className="h-4 w-4 text-blue-500" />
+              </div>
+              <span className="text-sm font-medium">Memory</span>
             </div>
-            <div className="flex items-baseline gap-1">
-              <span className="text-2xl font-semibold tracking-tight">{c.value}</span>
-              {c.unit && <span className="text-sm text-muted-foreground">{c.unit}</span>}
-            </div>
-            <p className="text-xs text-muted-foreground mt-1">{c.sub}</p>
+            <span className="text-xs text-muted-foreground">{Math.round(ramPercent)}%</span>
           </div>
-        ))}
+          <div className="text-3xl font-semibold tracking-tight">
+            {usage.used_ram || 0}
+            <span className="text-lg text-muted-foreground font-normal ml-1">MB</span>
+          </div>
+          <div className="mt-4 h-1.5 bg-secondary rounded-full overflow-hidden">
+            <div
+              className="h-full bg-blue-500 rounded-full transition-all duration-500"
+              style={{ width: `${ramPercent}%` }}
+            />
+          </div>
+          <p className="text-xs text-muted-foreground mt-2">of {plan.ram_mb || 512} MB plan limit</p>
+        </div>
+
+        {/* Deployments */}
+        <div className="bg-card border rounded-2xl p-5">
+          <div className="flex items-center gap-2 mb-4">
+            <div className="h-8 w-8 rounded-lg bg-violet-500/10 flex items-center justify-center">
+              <Box className="h-4 w-4 text-violet-500" />
+            </div>
+            <span className="text-sm font-medium">Deployments</span>
+          </div>
+          <div className="text-3xl font-semibold tracking-tight">{usage.deployments || 0}</div>
+          <div className="mt-4 flex items-center gap-2">
+            <div className="flex -space-x-1">
+              {[...Array(Math.min(3, usage.deployments || 0))].map((_, i) => (
+                <div key={i} className="h-5 w-5 rounded-full bg-violet-500/20 border-2 border-card" />
+              ))}
+            </div>
+            <span className="text-xs text-muted-foreground">of {plan.max_deployments || 3} allowed</span>
+          </div>
+        </div>
+
+        {/* Docker */}
+        <div className="bg-card border rounded-2xl p-5">
+          <div className="flex items-center gap-2 mb-4">
+            <div className={`h-8 w-8 rounded-lg flex items-center justify-center ${
+              docker.available ? 'bg-green-500/10' : 'bg-red-500/10'
+            }`}>
+              <Cpu className={`h-4 w-4 ${docker.available ? 'text-green-500' : 'text-red-500'}`} />
+            </div>
+            <span className="text-sm font-medium">Docker</span>
+          </div>
+          <div className="text-3xl font-semibold tracking-tight">
+            {docker.available ? 'Ready' : 'Offline'}
+          </div>
+          <p className="text-xs text-muted-foreground mt-4">
+            {docker.running || 0} containers running
+          </p>
+        </div>
+
+        {/* Storage */}
+        <div className="bg-card border rounded-2xl p-5">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
+              <div className="h-8 w-8 rounded-lg bg-amber-500/10 flex items-center justify-center">
+                <HardDrive className="h-4 w-4 text-amber-500" />
+              </div>
+              <span className="text-sm font-medium">Storage</span>
+            </div>
+            <span className="text-xs text-muted-foreground">{Math.round(storagePercent)}%</span>
+          </div>
+          <div className="text-3xl font-semibold tracking-tight">
+            {usage.used_storage || 0}
+            <span className="text-lg text-muted-foreground font-normal ml-1">MB</span>
+          </div>
+          <div className="mt-4 h-1.5 bg-secondary rounded-full overflow-hidden">
+            <div
+              className="h-full bg-amber-500 rounded-full transition-all duration-500"
+              style={{ width: `${storagePercent}%` }}
+            />
+          </div>
+          <p className="text-xs text-muted-foreground mt-2">of {plan.storage_mb || 1024} MB</p>
+        </div>
       </div>
 
-      {/* Content */}
-      <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
-        {/* Projects */}
-        <div className="lg:col-span-3 bg-card border rounded-xl">
-          <div className="flex items-center justify-between p-4 border-b">
-            <h2 className="font-medium">Recent Projects</h2>
-            <Link to="/projects" className="text-xs text-primary hover:underline flex items-center gap-1">
-              View all <ArrowUpRight className="h-3 w-3" />
+      {/* Main content */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Projects list */}
+        <div className="lg:col-span-2 bg-card border rounded-2xl">
+          <div className="flex items-center justify-between p-5 border-b">
+            <div>
+              <h2 className="font-semibold">Projects</h2>
+              <p className="text-xs text-muted-foreground mt-0.5">Recent deployments</p>
+            </div>
+            <Link
+              to="/projects"
+              className="text-sm text-primary hover:underline flex items-center gap-1"
+            >
+              View all <ChevronRight className="h-4 w-4" />
             </Link>
           </div>
-          <div className="p-2">
-            {projects.length === 0 ? (
-              <div className="py-12 text-center">
-                <Box className="h-8 w-8 mx-auto text-muted-foreground/50 mb-3" />
-                <p className="text-sm text-muted-foreground">No projects yet</p>
-                <Link to="/deploy" className="text-sm text-primary hover:underline mt-1 inline-block">
-                  Deploy your first app
-                </Link>
+          {projects.length === 0 ? (
+            <div className="p-12 text-center">
+              <div className="h-12 w-12 rounded-2xl bg-secondary mx-auto flex items-center justify-center mb-4">
+                <Box className="h-6 w-6 text-muted-foreground" />
               </div>
-            ) : (
-              <div className="divide-y">
-                {projects.slice(0, 5).map((p) => (
-                  <div key={p.id} className="flex items-center justify-between px-3 py-3 hover:bg-accent/50 rounded-lg transition-colors">
-                    <div className="min-w-0">
-                      <div className="font-medium text-sm truncate">{p.name}</div>
-                      <div className="text-xs text-muted-foreground">{p.type} · {p.ram_mb} MB</div>
+              <p className="font-medium">No projects yet</p>
+              <p className="text-sm text-muted-foreground mt-1 mb-4">
+                Deploy your first application to get started
+              </p>
+              <Link
+                to="/deploy"
+                className="inline-flex items-center gap-2 bg-primary text-white px-4 py-2 rounded-lg text-sm font-medium"
+              >
+                <Plus className="h-4 w-4" />
+                Deploy now
+              </Link>
+            </div>
+          ) : (
+            <div className="divide-y">
+              {projects.slice(0, 6).map((p) => (
+                <div
+                  key={p.id}
+                  className="flex items-center justify-between px-5 py-4 hover:bg-accent/30 transition-colors"
+                >
+                  <div className="flex items-center gap-4 min-w-0">
+                    <div className="h-10 w-10 rounded-xl bg-secondary flex items-center justify-center shrink-0">
+                      <Box className="h-5 w-5 text-muted-foreground" />
                     </div>
+                    <div className="min-w-0">
+                      <div className="font-medium truncate">{p.name}</div>
+                      <div className="text-xs text-muted-foreground">
+                        {p.type} · {p.ram_mb} MB RAM
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3">
                     <span className={`text-xs font-medium px-2.5 py-1 rounded-full ${
                       p.status === 'running'
                         ? 'bg-green-500/10 text-green-600'
@@ -92,41 +209,71 @@ export default function Dashboard() {
                     }`}>
                       {p.status}
                     </span>
+                    <ChevronRight className="h-4 w-4 text-muted-foreground" />
                   </div>
-                ))}
-              </div>
-            )}
-          </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
-        {/* Worker */}
-        <div className="lg:col-span-2 bg-card border rounded-xl p-4">
-          <div className="flex items-center gap-2 mb-4">
-            <Server className="h-4 w-4 text-muted-foreground" />
-            <h2 className="font-medium">Worker</h2>
+        {/* Right column */}
+        <div className="space-y-4">
+          {/* Worker card */}
+          <div className="bg-card border rounded-2xl p-5">
+            <div className="flex items-center gap-2 mb-5">
+              <Server className="h-4 w-4 text-muted-foreground" />
+              <h2 className="font-semibold">Worker</h2>
+            </div>
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-muted-foreground">Status</span>
+                <span className="flex items-center gap-2 text-sm font-medium text-green-600">
+                  <span className="relative flex h-2 w-2">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75" />
+                    <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500" />
+                  </span>
+                  Healthy
+                </span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-muted-foreground">Docker</span>
+                <span className={`text-sm font-medium ${docker.available ? 'text-green-600' : 'text-red-500'}`}>
+                  {docker.available ? 'Connected' : 'Offline'}
+                </span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-muted-foreground">Reserved RAM</span>
+                <span className="text-sm font-medium">{worker.reserved_ram_mb || 0} MB</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-muted-foreground">Mode</span>
+                <span className="text-sm font-medium">Local PC</span>
+              </div>
+            </div>
           </div>
-          <div className="space-y-3">
-            <div className="flex items-center justify-between py-2">
-              <span className="text-sm text-muted-foreground">Status</span>
-              <span className="flex items-center gap-1.5 text-sm font-medium text-green-600">
-                <span className="h-1.5 w-1.5 rounded-full bg-green-500" />
-                Healthy
-              </span>
-            </div>
-            <div className="flex items-center justify-between py-2 border-t">
-              <span className="text-sm text-muted-foreground">Docker</span>
-              <span className={`text-sm font-medium ${docker.available ? 'text-green-600' : 'text-red-500'}`}>
-                {docker.available ? 'Connected' : 'Offline'}
-              </span>
-            </div>
-            <div className="flex items-center justify-between py-2 border-t">
-              <span className="text-sm text-muted-foreground">Mode</span>
-              <span className="text-sm font-medium">Local PC</span>
+
+          {/* Quick actions */}
+          <div className="bg-card border rounded-2xl p-5">
+            <h2 className="font-semibold mb-4">Quick actions</h2>
+            <div className="space-y-2">
+              {[
+                { to: '/deploy?type=python', label: 'Deploy Python', icon: Zap },
+                { to: '/deploy?type=website', label: 'Deploy Website', icon: TrendingUp },
+                { to: '/monitoring', label: 'View Monitoring', icon: Activity },
+              ].map((a) => (
+                <Link
+                  key={a.to}
+                  to={a.to}
+                  className="flex items-center gap-3 p-2.5 rounded-lg hover:bg-accent transition-colors group"
+                >
+                  <a.icon className="h-4 w-4 text-muted-foreground group-hover:text-foreground" />
+                  <span className="text-sm">{a.label}</span>
+                  <ArrowUpRight className="h-3.5 w-3.5 ml-auto text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+                </Link>
+              ))}
             </div>
           </div>
-          <p className="text-xs text-muted-foreground mt-4 pt-3 border-t">
-            All data stays on this machine.
-          </p>
         </div>
       </div>
     </div>

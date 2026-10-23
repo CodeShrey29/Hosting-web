@@ -1,6 +1,7 @@
 from flask import Blueprint, request, jsonify, session
 from .db import get_db, dict_from_row, init_db, get_plan, get_user_usage, VOLUMES_DIR, UPLOADS_DIR
 from . import docker_worker
+from .templates import get_template, list_templates
 from datetime import datetime
 import os
 import zipfile
@@ -8,7 +9,6 @@ import shutil
 
 api = Blueprint("api", __name__, url_prefix="/api")
 
-# Simple local secret (change in production)
 LOCAL_SECRET = os.environ.get("HOSTING_SECRET", "local-pc-secret")
 
 @api.before_app_request
@@ -17,29 +17,24 @@ def ensure_db():
 
 @api.route("/health")
 def health():
-    return jsonify({
-        "status": "ok",
-        "mode": "local-pc",
-        "message": "Control plane running on this machine"
-    })
+    return jsonify({"status": "ok", "mode": "local-pc"})
 
 @api.route("/auth/login", methods=["POST"])
 def login():
     data = request.get_json() or {}
-    # Local mode: any email + secret works for now
     email = data.get("email", "local@pc")
     secret = data.get("secret", "")
-    if secret != LOCAL_SECRET and secret != "":
+    if secret and secret != LOCAL_SECRET:
         return jsonify({"error": "Invalid secret"}), 401
     session["user_id"] = 1
     session["email"] = email
-    return jsonify({"ok": True, "user": {"id": 1, "email": email, "plan": "Free"}})
+    return jsonify({"ok": True, "user": {"id": 1, "email": email}})
 
 @api.route("/auth/me")
 def me():
     if not session.get("user_id"):
         return jsonify({"authenticated": False})
-    return jsonify({"authenticated": True, "user": {"id": 1, "email": session.get("email", "local@pc")}})
+    return jsonify({"authenticated": True, "email": session.get("email")})
 
 @api.route("/status")
 def status():
@@ -56,9 +51,12 @@ def status():
         "projects": projects,
         "plan": plan,
         "usage": usage,
-        "mode": "Local PC",
-        "authenticated": bool(session.get("user_id"))
+        "mode": "Local PC"
     })
+
+@api.route("/templates")
+def templates():
+    return jsonify(list_templates())
 
 @api.route("/plans")
 def list_plans():
@@ -78,33 +76,33 @@ def list_projects():
 def create_project():
     data = request.get_json() or {}
     name = data.get("name", "untitled").replace(" ", "-").lower()
-    ptype = data.get("type", "custom")
+    ptype = data.get("type", "python")
     ram_mb = int(data.get("ram_mb", 512))
     storage_mb = int(data.get("storage_mb", 1024))
-    image = data.get("image", "python:3.11-slim")
     zip_filename = data.get("zip_filename")
+
+    tpl = get_template(ptype)
+    image = data.get("image") or tpl["image"]
+    command = data.get("command") or tpl.get("command")
+    env = tpl.get("env", {})
 
     plan = get_plan(1)
     usage = get_user_usage(1)
 
     if usage["deployments"] >= plan["max_deployments"]:
-        return jsonify({"error": f"Plan limit reached ({plan['max_deployments']} deployments)"}), 400
+        return jsonify({"error": f"Plan limit: max {plan['max_deployments']} deployments"}), 400
     if ram_mb > plan["ram_mb"]:
-        return jsonify({"error": f"RAM exceeds plan limit ({plan['ram_mb']} MB)"}), 400
-    if storage_mb > plan["storage_mb"]:
-        return jsonify({"error": f"Storage exceeds plan limit ({plan['storage_mb']} MB)"}), 400
+        return jsonify({"error": f"Plan limit: max {plan['ram_mb']} MB RAM"}), 400
 
     conn = get_db()
     worker = conn.execute("SELECT * FROM workers WHERE id = 1").fetchone()
-    available_ram = worker["total_ram_mb"] - worker["reserved_ram_mb"]
-    if ram_mb > available_ram:
+    if ram_mb > (worker["total_ram_mb"] - worker["reserved_ram_mb"]):
         conn.close()
         return jsonify({"error": "Not enough capacity on local worker"}), 400
 
     volume_path = str(VOLUMES_DIR / f"{name}-{int(datetime.utcnow().timestamp())}")
     os.makedirs(volume_path, exist_ok=True)
 
-    # Extract ZIP into volume if provided
     if zip_filename:
         zip_path = UPLOADS_DIR / zip_filename
         if zip_path.exists():
@@ -113,14 +111,15 @@ def create_project():
                     z.extractall(volume_path)
             except Exception as e:
                 conn.close()
-                return jsonify({"error": f"ZIP extract failed: {e}"}), 400
+                return jsonify({"error": f"ZIP failed: {e}"}), 400
 
     result = docker_worker.run_container(
         image=image,
         name=f"hosting-{name}-{int(datetime.utcnow().timestamp())}",
         ram_mb=ram_mb,
         volume_path=volume_path,
-        command=data.get("command"),
+        command=command,
+        env=env,
     )
 
     if "error" in result:
@@ -138,10 +137,10 @@ def create_project():
         (ram_mb, storage_mb),
     )
     conn.commit()
-    project_id = c.lastrowid
+    pid = c.lastrowid
     conn.close()
 
-    return jsonify({"id": project_id, "container": result, "status": "running", "volume": volume_path})
+    return jsonify({"id": pid, "status": "running", "container": result, "template": tpl["name"]})
 
 @api.route("/projects/<int:pid>/stop", methods=["POST"])
 def stop_project(pid):
@@ -150,10 +149,8 @@ def stop_project(pid):
     if not proj:
         conn.close()
         return jsonify({"error": "Not found"}), 404
-
     if proj.get("container_id"):
         docker_worker.stop_container(proj["container_id"])
-
     conn.execute("UPDATE projects SET status = 'stopped' WHERE id = ?", (pid,))
     conn.execute(
         "UPDATE workers SET reserved_ram_mb = MAX(0, reserved_ram_mb - ?), reserved_storage_mb = MAX(0, reserved_storage_mb - ?) WHERE id = 1",
@@ -163,6 +160,30 @@ def stop_project(pid):
     conn.close()
     return jsonify({"status": "stopped"})
 
+@api.route("/projects/<int:pid>/start", methods=["POST"])
+def start_project(pid):
+    conn = get_db()
+    proj = dict_from_row(conn.execute("SELECT * FROM projects WHERE id = ?", (pid,)).fetchone())
+    if not proj:
+        conn.close()
+        return jsonify({"error": "Not found"}), 404
+    client = docker_worker.get_client()
+    if client and proj.get("container_id"):
+        try:
+            c = client.containers.get(proj["container_id"])
+            c.start()
+        except Exception as e:
+            conn.close()
+            return jsonify({"error": str(e)}), 400
+    conn.execute("UPDATE projects SET status = 'running' WHERE id = ?", (pid,))
+    conn.execute(
+        "UPDATE workers SET reserved_ram_mb = reserved_ram_mb + ?, reserved_storage_mb = reserved_storage_mb + ? WHERE id = 1",
+        (proj["ram_mb"], proj["storage_mb"]),
+    )
+    conn.commit()
+    conn.close()
+    return jsonify({"status": "running"})
+
 @api.route("/projects/<int:pid>/logs")
 def project_logs(pid):
     conn = get_db()
@@ -170,13 +191,12 @@ def project_logs(pid):
     conn.close()
     if not proj or not proj.get("container_id"):
         return jsonify({"logs": "No container"})
-
     client = docker_worker.get_client()
     if not client:
         return jsonify({"logs": "Docker unavailable"})
     try:
         c = client.containers.get(proj["container_id"])
-        logs = c.logs(tail=100).decode("utf-8", errors="replace")
+        logs = c.logs(tail=150).decode("utf-8", errors="replace")
         return jsonify({"logs": logs or "(empty)"})
     except Exception as e:
         return jsonify({"logs": str(e)})
@@ -188,14 +208,10 @@ def delete_project(pid):
     if not proj:
         conn.close()
         return jsonify({"error": "Not found"}), 404
-
     if proj.get("container_id"):
         docker_worker.remove_container(proj["container_id"])
-
-    # Clean volume
     if proj.get("volume_path") and os.path.exists(proj["volume_path"]):
         shutil.rmtree(proj["volume_path"], ignore_errors=True)
-
     conn.execute("DELETE FROM projects WHERE id = ?", (pid,))
     if proj["status"] == "running":
         conn.execute(
@@ -216,8 +232,22 @@ def upload_file():
         return jsonify({"error": "No file"}), 400
     f = request.files["file"]
     if not f.filename:
-        return jsonify({"error": "Empty filename"}), 400
-    safe_name = f"{int(datetime.utcnow().timestamp())}_{f.filename}"
-    path = UPLOADS_DIR / safe_name
+        return jsonify({"error": "Empty"}), 400
+    safe = f"{int(datetime.utcnow().timestamp())}_{f.filename}"
+    path = UPLOADS_DIR / safe
     f.save(path)
-    return jsonify({"path": str(path), "filename": safe_name})
+    return jsonify({"filename": safe})
+
+@api.route("/admin/stats")
+def admin_stats():
+    conn = get_db()
+    total_projects = conn.execute("SELECT COUNT(*) as c FROM projects").fetchone()["c"]
+    running = conn.execute("SELECT COUNT(*) as c FROM projects WHERE status='running'").fetchone()["c"]
+    worker = dict_from_row(conn.execute("SELECT * FROM workers WHERE id=1").fetchone())
+    conn.close()
+    return jsonify({
+        "total_projects": total_projects,
+        "running": running,
+        "worker": worker,
+        "docker": docker_worker.get_docker_info()
+    })

@@ -1,4 +1,4 @@
-"""Local Docker worker with volume support."""
+"""Local Docker worker with volume + env support."""
 import docker
 from docker.errors import DockerException
 from pathlib import Path
@@ -37,38 +37,34 @@ def run_container(
 ):
     client = get_client()
     if not client:
-        return {"error": "Docker not available on this machine"}
+        return {"error": "Docker not available"}
 
-    mem_limit = f"{ram_mb}m"
     volumes = {}
     if volume_path:
         Path(volume_path).mkdir(parents=True, exist_ok=True)
-        volumes[volume_path] = {"bind": "/data", "mode": "rw"}
+        volumes[str(volume_path)] = {"bind": "/data", "mode": "rw"}
 
     try:
-        container = client.containers.run(
-            image,
-            name=name,
-            detach=True,
-            mem_limit=mem_limit,
-            environment=env or {},
-            volumes=volumes,
-            command=command,
-            restart_policy={"Name": "unless-stopped"},
-            labels={"hosting.managed": "true"},
-        )
-        return {
-            "id": container.id[:12],
-            "name": container.name,
-            "status": container.status,
+        kwargs = {
+            "detach": True,
+            "name": name,
+            "mem_limit": f"{ram_mb}m",
+            "environment": env or {},
+            "volumes": volumes,
+            "restart_policy": {"Name": "unless-stopped"},
+            "labels": {"hosting.managed": "true"},
         }
+        if command:
+            kwargs["command"] = command
+        container = client.containers.run(image, **kwargs)
+        return {"id": container.id[:12], "name": container.name, "status": container.status}
     except Exception as e:
         return {"error": str(e)}
 
 def stop_container(name_or_id: str):
     client = get_client()
     if not client:
-        return {"error": "Docker not available"}
+        return {"error": "Docker unavailable"}
     try:
         c = client.containers.get(name_or_id)
         c.stop()
@@ -79,7 +75,7 @@ def stop_container(name_or_id: str):
 def remove_container(name_or_id: str):
     client = get_client()
     if not client:
-        return {"error": "Docker not available"}
+        return {"error": "Docker unavailable"}
     try:
         c = client.containers.get(name_or_id)
         c.remove(force=True)
@@ -90,7 +86,7 @@ def remove_container(name_or_id: str):
 def get_docker_info():
     client = get_client()
     if not client:
-        return {"available": False, "message": "Docker not running or not installed"}
+        return {"available": False}
     try:
         info = client.info()
         return {
@@ -98,22 +94,6 @@ def get_docker_info():
             "version": info.get("ServerVersion"),
             "containers": info.get("Containers"),
             "running": info.get("ContainersRunning"),
-            "memory_total": info.get("MemTotal"),
-        }
-    except Exception as e:
-        return {"available": False, "message": str(e)}
-
-def get_container_stats(container_id: str):
-    client = get_client()
-    if not client:
-        return None
-    try:
-        c = client.containers.get(container_id)
-        stats = c.stats(stream=False)
-        mem = stats.get("memory_stats", {})
-        return {
-            "memory_usage": mem.get("usage", 0),
-            "memory_limit": mem.get("limit", 0),
         }
     except Exception:
-        return None
+        return {"available": False}

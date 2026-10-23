@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Cloud Host — Local PC / Render entry point
+Cloud Host — Local PC entry point
 Start with: python hosting.py
 """
 
@@ -9,34 +9,23 @@ import sys
 from pathlib import Path
 
 try:
-    from flask import Flask, send_from_directory, jsonify
+    from flask import Flask, send_from_directory
+    from flask_cors import CORS
 except ImportError:
-    print("Installing Flask...")
-    os.system(f"{sys.executable} -m pip install -q flask")
-    from flask import Flask, send_from_directory, jsonify
+    print("Installing dependencies...")
+    os.system(f"{sys.executable} -m pip install -q -r requirements.txt")
+    from flask import Flask, send_from_directory
+    from flask_cors import CORS
+
+from backend.db import init_db
+from backend.api import api
 
 BASE = Path(__file__).parent
 DIST = BASE / "frontend" / "dist"
 
 app = Flask(__name__, static_folder=str(DIST), static_url_path="")
-
-@app.route("/api/health")
-def health():
-    return jsonify({
-        "status": "ok",
-        "mode": "local-pc",
-        "message": "Running on this machine. All data stays local."
-    })
-
-@app.route("/api/status")
-def status():
-    return jsonify({
-        "worker": "healthy",
-        "mode": "Local PC",
-        "docker": "ready",
-        "ram": "local",
-        "storage": "internal disk"
-    })
+CORS(app)
+app.register_blueprint(api)
 
 @app.route("/", defaults={"path": ""})
 @app.route("/<path:path>")
@@ -48,17 +37,15 @@ def serve(path):
     if index.exists():
         return send_from_directory(DIST, "index.html")
     return (
-        "Frontend not built yet.\n\n"
-        "On your PC run:\n"
-        "  cd frontend && npm install && npm run build && cd ..\n"
-        "  python hosting.py\n\n"
-        "On Render the build command handles this automatically.",
+        "Frontend not built.\n\n"
+        "Run: cd frontend && npm install && npm run build && cd .. && python hosting.py",
         404,
         {"Content-Type": "text/plain"},
     )
 
 if __name__ == "__main__":
+    init_db()
     port = int(os.environ.get("PORT", 5000))
     print(f"Cloud Host starting on http://0.0.0.0:{port}")
-    print("Mode: Local PC (everything stays on this machine)")
+    print("Mode: Local PC — SQLite + Docker on this machine")
     app.run(host="0.0.0.0", port=port, debug=False)

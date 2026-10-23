@@ -1,30 +1,21 @@
 # Hosting Platform — Local PC Edition
 
-Real control plane + Docker worker that runs entirely on your PC.
-
-## Start
+Just run one command:
 
 ```bash
-pip install -r requirements.txt
-cd frontend && npm install && npm run build && cd ..
 python hosting.py
 ```
 
-Open http://localhost:5000
+It will automatically:
+1. Install Python dependencies if needed
+2. Build the frontend the first time (requires Node.js)
+3. Start the control plane + serve the UI
 
-## What works now
-- SQLite database (data/hosting.db) — stays on the PC
-- Real Docker integration (start/stop containers with RAM limits)
-- Resource reservation on the local worker
-- Projects stored and tracked
-- Frontend connected to live API
-- `/api/status`, `/api/projects`, deploy flow
+Open http://localhost:5000
 
 ## Requirements
 - Python 3.10+
-- Docker running on the same machine
-- Node.js (only for building frontend)
+- Node.js + npm (only for the first frontend build)
+- Docker (for real container deployments)
 
-Everything stays on this PC. No external database or cloud required.
-
-Next steps from the full prompt: better scheduler, storage volumes, metering, auth, and plan enforcement.
+Everything stays on your PC. SQLite database in `data/hosting.db`.

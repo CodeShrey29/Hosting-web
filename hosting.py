@@ -14,7 +14,13 @@ from flask import Flask, jsonify, request, send_from_directory
 from werkzeug.middleware.proxy_fix import ProxyFix
 
 from backend.db import init_db
-from backend.api import admin_auth_configured, api, auth_required, get_deployment_mode
+from backend.api import (
+    admin_auth_configured,
+    api,
+    auth_required,
+    get_deployment_mode,
+    persistent_storage_available,
+)
 
 BASE = Path(__file__).parent
 FRONTEND = BASE / "frontend"
@@ -45,6 +51,46 @@ def ensure_frontend():
         print(f"Auto-build skipped (Node.js not available): {e}")
         return False
 
+
+def get_secret_key():
+    secret_key = os.environ.get("SECRET_KEY", "").strip()
+    if secret_key:
+        return secret_key
+    if get_deployment_mode() != "render":
+        return secrets.token_hex(32)
+    if not persistent_storage_available():
+        raise RuntimeError(
+            "SECRET_KEY is missing and persistent storage is unavailable. "
+            "Set SECRET_KEY in the Render environment or configure the persistent disk."
+        )
+
+    key_path = Path(os.environ.get("DATA_DIR", BASE / "data")) / ".flask_secret_key"
+    try:
+        descriptor = os.open(key_path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+    except FileExistsError:
+        pass
+    except OSError as error:
+        raise RuntimeError("Could not create the persistent Flask secret key.") from error
+    else:
+        with os.fdopen(descriptor, "w", encoding="ascii") as key_file:
+            key_file.write(secrets.token_hex(32))
+            key_file.flush()
+            os.fsync(key_file.fileno())
+
+    try:
+        file_stat = key_path.lstat()
+        if not key_path.is_file() or key_path.is_symlink():
+            raise RuntimeError("The persistent Flask secret key path is not a regular file.")
+        if file_stat.st_mode & 0o077:
+            key_path.chmod(0o600)
+        secret_key = key_path.read_text(encoding="ascii").strip()
+    except OSError as error:
+        raise RuntimeError("Could not read the persistent Flask secret key.") from error
+    if len(secret_key) < 64:
+        raise RuntimeError("The persistent Flask secret key is missing or invalid.")
+    return secret_key
+
+
 app = Flask(__name__, static_folder=str(DIST) if DIST.exists() else None, static_url_path="")
 render_mode = get_deployment_mode() == "render"
 if auth_required() and not admin_auth_configured():
@@ -52,10 +98,7 @@ if auth_required() and not admin_auth_configured():
         "The control plane is exposed but administrator credentials are missing or invalid. "
         "Configure ADMIN_EMAIL and an ADMIN_PASSWORD with at least 16 characters."
     )
-secret_key = os.environ.get("SECRET_KEY")
-if render_mode and not secret_key:
-    raise RuntimeError("SECRET_KEY must be configured in the Render environment.")
-app.secret_key = secret_key or secrets.token_hex(32)
+app.secret_key = get_secret_key()
 app.config.update(
     SESSION_COOKIE_HTTPONLY=True,
     SESSION_COOKIE_SAMESITE="Lax",

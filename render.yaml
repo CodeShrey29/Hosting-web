@@ -5,6 +5,10 @@ services:
     buildCommand: pip install -r requirements.txt && (cd frontend && npm ci && npm run build)
     startCommand: gunicorn --bind 0.0.0.0:$PORT --workers 1 --threads 4 --timeout 120 hosting:app
     healthCheckPath: /api/health
+    disk:
+      name: hosting-data
+      mountPath: /var/data
+      sizeGB: 1
     envVars:
       - key: SECRET_KEY
         generateValue: true
@@ -13,6 +17,6 @@ services:
       - key: ADMIN_PASSWORD
         sync: false
       - key: DATA_DIR
-        value: /opt/render/project/src/data
+        value: /var/data
       - key: PERSISTENT_STORAGE
-        sync: false
+        value: "true"

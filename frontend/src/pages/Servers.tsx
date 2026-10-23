@@ -106,7 +106,7 @@ export default function Servers() {
 
       <section className="inline-alert inline-alert-neutral items-start">
         <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
-        <p className="text-[11px] leading-relaxed">The current API reports configured reservation capacity, not live CPU, memory, disk health, or network throughput. Remote worker enrollment is not configured.</p>
+        <p className="text-[11px] leading-relaxed">These are configured reservation limits. Per-container CPU, memory, project-volume usage, and Docker network counters are sampled on the Monitoring page; host-wide disk health and historical metrics are not collected. Remote worker enrollment is not configured.</p>
       </section>
     </div>
   )

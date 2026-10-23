@@ -9,7 +9,7 @@ import uuid
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-from flask import Blueprint, current_app, jsonify, request, session
+from flask import Blueprint, current_app, jsonify, request, send_file, session
 from werkzeug.utils import secure_filename
 
 from . import docker_worker
@@ -263,7 +263,7 @@ def list_projects():
     conn = get_db()
     try:
         rows = conn.execute(
-            "SELECT id, name, type, status, ram_mb, cpu_limit, storage_mb, created_at "
+            "SELECT id, name, type, status, ram_mb, cpu_limit, storage_mb, host_port, created_at "
             "FROM projects WHERE user_id = 1 ORDER BY created_at DESC, id DESC"
         ).fetchall()
         return jsonify([dict(row) for row in rows])
@@ -353,12 +353,16 @@ def create_project():
 
         volume_path = str(VOLUMES_DIR / uuid.uuid4().hex)
         Path(volume_path).mkdir(parents=True, exist_ok=False)
+        for relative_name, contents in tpl.get("starter_files", {}).items():
+            (Path(volume_path) / relative_name).write_text(contents, encoding="utf-8")
         result = docker_worker.run_container(
             image=image.strip(),
             name=f"hosting-{uuid.uuid4().hex[:20]}",
             ram_mb=ram_mb,
             cpu_limit=cpu_allocation,
             volume_path=volume_path,
+            volume_target=tpl.get("volume_target", "/data"),
+            port=tpl.get("port"),
             command=command,
             env=tpl.get("env", {}),
         )
@@ -379,9 +383,9 @@ def create_project():
         now = datetime.now(timezone.utc).isoformat()
         cursor = conn.execute(
             """INSERT INTO projects
-               (user_id, name, type, status, ram_mb, storage_mb, cpu_limit, container_id, volume_path, created_at)
-               VALUES (1, ?, ?, 'running', ?, ?, ?, ?, ?, ?)""",
-            (name.strip(), ptype, ram_mb, storage_mb, cpu_allocation, result.get("id"), volume_path, now),
+               (user_id, name, type, status, ram_mb, storage_mb, cpu_limit, container_id, volume_path, host_port, created_at)
+               VALUES (1, ?, ?, 'running', ?, ?, ?, ?, ?, ?, ?)""",
+            (name.strip(), ptype, ram_mb, storage_mb, cpu_allocation, result.get("id"), volume_path, result.get("host_port"), now),
         )
         conn.commit()
         return jsonify({
@@ -417,6 +421,261 @@ def get_project(conn, project_id):
     return dict_from_row(conn.execute(
         "SELECT * FROM projects WHERE id = ? AND user_id = 1", (project_id,)
     ).fetchone())
+
+
+def project_file_path(project, requested_path):
+    if not isinstance(requested_path, str) or "\x00" in requested_path or "\\" in requested_path:
+        raise ValueError("File path is invalid.")
+    relative = Path(requested_path)
+    if relative.is_absolute() or any(part in {".", ".."} for part in relative.parts):
+        raise ValueError("File path must stay within the project directory.")
+    root = Path(project["volume_path"]).resolve(strict=True)
+    managed_root = VOLUMES_DIR.resolve(strict=True)
+    if root == managed_root or not root.is_relative_to(managed_root):
+        raise ValueError("Project storage is outside the managed volume directory.")
+    candidate = root.joinpath(relative)
+    current = root
+    for part in relative.parts:
+        current = current / part
+        if current.is_symlink():
+            raise ValueError("Project symlinks cannot be accessed from the file manager.")
+    resolved = candidate.resolve(strict=False)
+    if not resolved.is_relative_to(root):
+        raise ValueError("File path must stay within the project directory.")
+    return root, candidate
+
+
+def project_storage_usage(root):
+    total = 0
+    for directory, subdirectories, filenames in os.walk(root, followlinks=False):
+        subdirectories[:] = [
+            name for name in subdirectories
+            if not (Path(directory) / name).is_symlink()
+        ]
+        for filename in filenames:
+            file_path = Path(directory) / filename
+            if not file_path.is_symlink() and file_path.is_file():
+                total += file_path.stat().st_size
+    return total
+
+
+def project_for_file_operation(conn, project_id):
+    project = get_project(conn, project_id)
+    if not project:
+        return None, (api_error("Project not found.", 404))
+    if not project.get("volume_path"):
+        return None, api_error("This project has no managed storage volume.", 404)
+    try:
+        root, _ = project_file_path(project, "")
+    except (OSError, ValueError):
+        current_app.logger.exception("Project storage volume is unavailable or invalid.")
+        return None, api_error("Project storage is unavailable.", 404)
+    if not root.is_dir():
+        return None, api_error("Project storage is unavailable.", 404)
+    return project, None
+
+
+@api.route("/projects/<int:pid>/files")
+def list_project_files(pid):
+    conn = get_db()
+    try:
+        project, error = project_for_file_operation(conn, pid)
+    finally:
+        conn.close()
+    if error:
+        return error
+    try:
+        _, directory = project_file_path(project, request.args.get("path", ""))
+        if not directory.is_dir():
+            return api_error("The requested path is not a directory.", 400)
+        entries = []
+        for path in sorted(directory.iterdir(), key=lambda item: (not item.is_dir(), item.name.casefold())):
+            if path.is_symlink():
+                continue
+            stat = path.stat()
+            entries.append({
+                "name": path.name,
+                "path": path.relative_to(project["volume_path"]).as_posix(),
+                "type": "directory" if path.is_dir() else "file",
+                "size": stat.st_size if path.is_file() else None,
+                "modified_at": datetime.fromtimestamp(stat.st_mtime, timezone.utc).isoformat(),
+            })
+        return jsonify({"path": request.args.get("path", ""), "entries": entries})
+    except (OSError, ValueError) as error:
+        return api_error(str(error) or "Could not list project files.", 400)
+
+
+@api.route("/projects/<int:pid>/files/content")
+def read_project_file(pid):
+    conn = get_db()
+    try:
+        project, error = project_for_file_operation(conn, pid)
+    finally:
+        conn.close()
+    if error:
+        return error
+    try:
+        _, path = project_file_path(project, request.args.get("path", ""))
+        if not path.is_file():
+            return api_error("The requested file does not exist.", 404)
+        if path.stat().st_size > 1_000_000:
+            return api_error("File is too large to edit in the browser (1 MB maximum).", 413)
+        content = path.read_bytes()
+        try:
+            text = content.decode("utf-8")
+        except UnicodeDecodeError:
+            return api_error("This file is binary and cannot be edited in the browser.", 415)
+        return jsonify({"path": request.args.get("path", ""), "content": text})
+    except (OSError, ValueError) as error:
+        return api_error(str(error) or "Could not read project file.", 400)
+
+
+@api.route("/projects/<int:pid>/files/download")
+def download_project_file(pid):
+    conn = get_db()
+    try:
+        project, error = project_for_file_operation(conn, pid)
+    finally:
+        conn.close()
+    if error:
+        return error
+    try:
+        _, path = project_file_path(project, request.args.get("path", ""))
+        if not path.is_file():
+            return api_error("The requested file does not exist.", 404)
+        return send_file(path, as_attachment=True, download_name=path.name)
+    except (OSError, ValueError) as error:
+        return api_error(str(error) or "Could not download project file.", 400)
+
+
+@api.route("/projects/<int:pid>/files/content", methods=["PUT"])
+def write_project_file(pid):
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict):
+        return api_error("Send a JSON object containing path and content.", 400)
+    relative_path = data.get("path")
+    content = data.get("content")
+    if not isinstance(content, str) or len(content.encode("utf-8")) > 1_000_000:
+        return api_error("File content must be text no larger than 1 MB.", 413)
+    conn = get_db()
+    try:
+        project, error = project_for_file_operation(conn, pid)
+    finally:
+        conn.close()
+    if error:
+        return error
+    try:
+        root, path = project_file_path(project, relative_path)
+        if path == root or not path.parent.is_dir():
+            return api_error("Choose a file inside an existing project folder.", 400)
+        if path.exists() and not path.is_file():
+            return api_error("The selected path is not a file.", 400)
+        old_size = path.stat().st_size if path.is_file() else 0
+        requested_size = len(content.encode("utf-8"))
+        if project_storage_usage(root) - old_size + requested_size > project["storage_mb"] * 1024 * 1024:
+            return api_error("The project storage allocation would be exceeded.", 413)
+        temporary = path.with_name(f".{path.name}.{uuid.uuid4().hex}.tmp")
+        try:
+            temporary.write_text(content, encoding="utf-8")
+            os.replace(temporary, path)
+        finally:
+            temporary.unlink(missing_ok=True)
+        return jsonify({"path": relative_path, "size": path.stat().st_size})
+    except (OSError, TypeError, ValueError) as error:
+        return api_error(str(error) or "Could not write project file.", 400)
+
+
+@api.route("/projects/<int:pid>/files/upload", methods=["POST"])
+def upload_project_file(pid):
+    uploaded = request.files.get("file")
+    if not uploaded or not uploaded.filename:
+        return api_error("Choose a file to upload.", 400)
+    filename = secure_filename(uploaded.filename)
+    if not filename:
+        return api_error("The filename is invalid.", 400)
+    conn = get_db()
+    try:
+        project, error = project_for_file_operation(conn, pid)
+    finally:
+        conn.close()
+    if error:
+        return error
+    try:
+        _, parent = project_file_path(project, request.form.get("path", ""))
+        if not parent.is_dir():
+            return api_error("The selected destination folder does not exist.", 404)
+        destination = parent / filename
+        if destination.exists():
+            return api_error("A file or folder with that name already exists.", 409)
+        root, _ = project_file_path(project, "")
+        used_storage = project_storage_usage(root)
+        temporary = parent / f".{uuid.uuid4().hex}.upload"
+        try:
+            uploaded.save(temporary)
+            if used_storage + temporary.stat().st_size > project["storage_mb"] * 1024 * 1024:
+                return api_error("The project storage allocation would be exceeded.", 413)
+            try:
+                os.link(temporary, destination)
+            except FileExistsError:
+                return api_error("A file or folder with that name already exists.", 409)
+        finally:
+            temporary.unlink(missing_ok=True)
+        return jsonify({"name": filename, "size": destination.stat().st_size}), 201
+    except (OSError, ValueError) as error:
+        return api_error(str(error) or "Could not upload project file.", 400)
+
+
+@api.route("/projects/<int:pid>/files/folders", methods=["POST"])
+def create_project_folder(pid):
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict):
+        return api_error("Send a JSON object containing path and name.", 400)
+    name = data.get("name")
+    if not isinstance(name, str) or name in {"", ".", ".."} or "/" in name or "\\" in name or "\x00" in name:
+        return api_error("Folder name must be a single valid path component.", 400)
+    conn = get_db()
+    try:
+        project, error = project_for_file_operation(conn, pid)
+    finally:
+        conn.close()
+    if error:
+        return error
+    try:
+        _, parent = project_file_path(project, data.get("path", ""))
+        if not parent.is_dir():
+            return api_error("The selected parent folder does not exist.", 404)
+        folder = parent / name
+        folder.mkdir()
+        return jsonify({"name": name}), 201
+    except FileExistsError:
+        return api_error("A file or folder with that name already exists.", 409)
+    except (OSError, TypeError, ValueError) as error:
+        return api_error(str(error) or "Could not create project folder.", 400)
+
+
+@api.route("/projects/<int:pid>/files", methods=["DELETE"])
+def delete_project_file(pid):
+    relative_path = request.args.get("path", "")
+    conn = get_db()
+    try:
+        project, error = project_for_file_operation(conn, pid)
+    finally:
+        conn.close()
+    if error:
+        return error
+    try:
+        root, path = project_file_path(project, relative_path)
+        if path == root:
+            return api_error("The project root cannot be deleted.", 400)
+        if path.is_dir():
+            shutil.rmtree(path)
+        elif path.is_file():
+            path.unlink()
+        else:
+            return api_error("The requested file or folder does not exist.", 404)
+        return jsonify({"status": "deleted"})
+    except (OSError, ValueError) as error:
+        return api_error(str(error) or "Could not delete project file.", 400)
 
 
 @api.route("/projects/<int:pid>/stop", methods=["POST"])
@@ -484,6 +743,25 @@ def start_project(pid):
         conn.close()
 
 
+@api.route("/projects/<int:pid>/restart", methods=["POST"])
+def restart_project(pid):
+    conn = get_db()
+    try:
+        project = get_project(conn, pid)
+    finally:
+        conn.close()
+    if not project:
+        return api_error("Project not found.", 404)
+    if project["status"] != "running":
+        return api_error("Start the project before restarting it.", 409)
+    if not project.get("container_id"):
+        return api_error("No container is associated with this project.", 409)
+    result = docker_worker.restart_container(project["container_id"])
+    if "error" in result:
+        return api_error(result["error"], 502)
+    return jsonify({"status": "running"})
+
+
 @api.route("/projects/<int:pid>/logs")
 def project_logs(pid):
     conn = get_db()
@@ -546,6 +824,52 @@ def docker_containers():
     if isinstance(containers, dict) and "error" in containers:
         return api_error(containers["error"], 503)
     return jsonify(containers)
+
+
+@api.route("/monitoring/metrics")
+def monitoring_metrics():
+    if get_deployment_mode() == "render":
+        return api_error("No worker is enrolled with this Render control plane.", 503)
+    client = docker_worker.get_client()
+    if not client:
+        return api_error("Docker daemon is unavailable; live metrics cannot be sampled.", 503)
+    conn = get_db()
+    try:
+        projects = conn.execute(
+            "SELECT id, name, type, container_id, volume_path, storage_mb FROM projects "
+            "WHERE user_id = 1 AND status = 'running' ORDER BY id"
+        ).fetchall()
+    finally:
+        conn.close()
+    metrics = []
+    for row in projects:
+        project = dict(row)
+        measured = docker_worker.container_metrics(project["container_id"], client)
+        if "error" in measured:
+            metrics.append({
+                "project_id": project["id"],
+                "name": project["name"],
+                "error": measured["error"],
+            })
+            continue
+        try:
+            volume_root, _ = project_file_path(project, "")
+            storage_used = project_storage_usage(volume_root)
+        except (OSError, ValueError):
+            storage_used = None
+        metrics.append({
+            "project_id": project["id"],
+            "name": project["name"],
+            "type": project["type"],
+            "storage_used_bytes": storage_used,
+            "storage_limit_bytes": project["storage_mb"] * 1024 * 1024,
+            **measured,
+        })
+    return jsonify({
+        "sampled_at": datetime.now(timezone.utc).isoformat(),
+        "sampling": "instantaneous",
+        "metrics": metrics,
+    })
 
 
 @api.route("/upload", methods=["POST"])

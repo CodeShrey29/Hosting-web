@@ -21,12 +21,14 @@ interface Template {
   name: string
   description: string
   image?: string
+  command?: string | null
 }
 
 interface RuntimeStatus {
   mode?: string
   worker?: { name?: string; status?: string }
   docker?: { available?: boolean }
+  plan?: { ram_mb?: number; storage_mb?: number; cpu_limit?: number; max_deployments?: number }
 }
 
 const templateIcons: Record<string, typeof Box> = {
@@ -45,14 +47,29 @@ export default function Deploy() {
   const [selected, setSelected] = useState(searchParams.get('type') || 'python')
   const [name, setName] = useState('')
   const [ram, setRam] = useState(512)
+  const [storage, setStorage] = useState(1024)
+  const [image, setImage] = useState('')
+  const [command, setCommand] = useState('')
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
   const [loadingTemplates, setLoadingTemplates] = useState(true)
   const [loading, setLoading] = useState(false)
+  const activeTemplate = templates.find((template) => template.id === selected)
+  const maxRam = runtime?.plan?.ram_mb || 512
+  const ramOptions = [256, 512, 1024, 2048].filter((value) => value <= maxRam)
+  if (!ramOptions.length && maxRam >= 64) ramOptions.push(maxRam)
+  const maxStorage = runtime?.plan?.storage_mb || 1024
+  const storageOptions = [128, 256, 512, 1024, 2048, 5120].filter((value) => value <= maxStorage)
+  if (!storageOptions.length && maxStorage >= 1) storageOptions.push(maxStorage)
 
   useEffect(() => {
     const type = searchParams.get('type')
     if (type) setSelected(type)
   }, [searchParams])
+
+  useEffect(() => {
+    setImage(activeTemplate?.image || '')
+    setCommand(activeTemplate?.command || '')
+  }, [activeTemplate?.id, activeTemplate?.image, activeTemplate?.command])
 
   useEffect(() => {
     const loadResources = async () => {
@@ -64,6 +81,8 @@ export default function Deploy() {
         if (!Array.isArray(data)) throw new Error('The API returned invalid template data.')
         setTemplates(data)
         setRuntime(nextRuntime)
+        if (nextRuntime.plan?.ram_mb) setRam((current) => Math.min(current, nextRuntime.plan.ram_mb!))
+        if (nextRuntime.plan?.storage_mb) setStorage((current) => Math.min(current, nextRuntime.plan.storage_mb!))
         if (!nextRuntime.docker?.available) setRuntimeError('No Docker runtime is available. A configured worker is required before this workload can be deployed.')
       } catch (cause) {
         setRuntimeError(cause instanceof Error ? cause.message : 'Could not load deployment resources.')
@@ -96,7 +115,14 @@ export default function Deploy() {
       const response = await apiFetch('/api/projects', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, type: selected, ram_mb: ram }),
+        body: JSON.stringify({
+          name,
+          type: selected,
+          ram_mb: ram,
+          storage_mb: storage,
+          ...(selected === 'docker' && image.trim() ? { image: image.trim() } : {}),
+          ...(command.trim() ? { command: command.trim() } : {}),
+        }),
       })
       const data = await response.json()
       if (!response.ok) throw new Error(data.error || 'The deployment could not be created.')
@@ -108,8 +134,6 @@ export default function Deploy() {
       setLoading(false)
     }
   }
-
-  const activeTemplate = templates.find((template) => template.id === selected)
 
   return (
     <div className="page-content space-y-6">
@@ -167,12 +191,28 @@ export default function Deploy() {
             <label className="field-label">
               Memory allocation
               <select className="select-field mt-2 w-full" value={ram} onChange={(event) => setRam(Number(event.target.value))}>
-                <option value={256}>256 MB</option>
-                <option value={512}>512 MB</option>
-                <option value={1024}>1 GB</option>
-                <option value={2048}>2 GB</option>
+                {ramOptions.map((value) => <option key={value} value={value}>{value >= 1024 ? `${value / 1024} GB` : `${value} MB`}</option>)}
               </select>
               <span className="field-hint">The backend validates this request against your plan and worker capacity.</span>
+            </label>
+            <label className="field-label">
+              Persistent project storage
+              <select className="select-field mt-2 w-full" value={storage} onChange={(event) => setStorage(Number(event.target.value))}>
+                {storageOptions.map((value) => <option key={value} value={value}>{value >= 1024 ? `${value / 1024} GB` : `${value} MB`}</option>)}
+              </select>
+              <span className="field-hint">Maximum allowed by your current plan: {maxStorage >= 1024 ? `${(maxStorage / 1024).toFixed(maxStorage % 1024 ? 1 : 0)} GB` : `${maxStorage} MB`}.</span>
+            </label>
+            {selected === 'docker' && (
+              <label className="field-label">
+                Docker image
+                <input className="input-field mt-2" value={image} onChange={(event) => setImage(event.target.value)} placeholder="e.g. nginx:alpine" maxLength={256} required />
+                <span className="field-hint">The local Docker daemon pulls this image. Never deploy images you do not trust.</span>
+              </label>
+            )}
+            <label className="field-label">
+              Startup command
+              <input className="input-field mt-2 font-mono" value={command} onChange={(event) => setCommand(event.target.value)} placeholder="Use the image's default command" maxLength={2048} />
+              <span className="field-hint">Runs inside the isolated container. Project files are mounted under /data.</span>
             </label>
           </div>
 

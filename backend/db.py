@@ -91,6 +91,7 @@ def init_db():
         cpu_limit REAL NOT NULL DEFAULT 0.5,
         container_id TEXT,
         volume_path TEXT,
+        host_port INTEGER,
         created_at TEXT
     );
 
@@ -140,6 +141,8 @@ def init_db():
     project_columns = {row["name"] for row in c.execute("PRAGMA table_info(projects)")}
     if "cpu_limit" not in project_columns:
         c.execute("ALTER TABLE projects ADD COLUMN cpu_limit REAL NOT NULL DEFAULT 0.5")
+    if "host_port" not in project_columns:
+        c.execute("ALTER TABLE projects ADD COLUMN host_port INTEGER")
     worker_columns = {row["name"] for row in c.execute("PRAGMA table_info(workers)")}
     if "total_cpu" not in worker_columns:
         c.execute("ALTER TABLE workers ADD COLUMN total_cpu REAL NOT NULL DEFAULT 1.0")

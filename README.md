@@ -18,7 +18,7 @@ npm ci
 npm run build
 ```
 
-The local SQLite database and workload data live under `data/`. Deployments require a working local Docker daemon.
+The local SQLite database and workload data live under `data/`. Deployments require a working local Docker daemon and a non-root service account. Workload containers run as that same non-root UID/GID with all Linux capabilities dropped; if the control plane itself runs as root, set `WORKLOAD_UID` and `WORKLOAD_GID` to a valid non-root account or workload creation fails closed. Local website, Python, and Node.js HTTP ports are published on `127.0.0.1` only, not exposed to your LAN or the public internet. The project file manager reads and writes each workload's managed volume, enforces its configured file-manager storage allocation, and supports safe text editing and file upload/download. The Node.js template creates an editable starter server in that volume.
 
 ## Deploy on Render
 
@@ -30,6 +30,6 @@ This repository does not enroll a remote worker or provide a Docker runtime on R
 
 ## Current implementation boundary
 
-Working API-backed surfaces include project listing and lifecycle actions, template-based deployment requests, plan/usage display, and worker/runtime status. The local Docker adapter can provision containers when run on a host with Docker. Local worker memory and CPU limits account for Linux cgroups when available; disk capacity is discovered from the data volume at startup. Set `WORKER_MEMORY_LIMIT_MB`, `WORKER_CPU_LIMIT`, and `WORKER_STORAGE_LIMIT_MB` to apply stricter operator caps. Container launches apply memory, swap, CPU, process-count, dropped-capability, and no-new-privileges limits.
+Working API-backed surfaces include project listing and lifecycle actions, template-based deployment requests, plan/usage display, and worker/runtime status. The local Docker adapter can provision containers when run on a host with Docker. Local worker memory and CPU limits account for Linux cgroups when available; disk capacity is discovered from the data volume at startup. Set `WORKER_MEMORY_LIMIT_MB`, `WORKER_CPU_LIMIT`, and `WORKER_STORAGE_LIMIT_MB` to apply stricter operator caps. Container launches apply memory, swap, CPU, process-count, dropped-capability, and no-new-privileges limits. The Monitoring page samples live Docker CPU, memory, project-volume size, and network counters without persisting a history. File-manager operations enforce the per-project allocation, but Docker writes to a bind-mounted volume are not kernel-quota-enforced; this remains a local single-administrator prototype, not safe multi-tenant storage isolation.
 
 This is **not yet a production hosting platform**. Production use still requires, at minimum, multi-user authentication and tenant authorization, a shared durable database and object storage, an authenticated remote worker/agent, real telemetry and transfer metering, ingress and TLS, backups and restore, abuse controls, and payment-provider integration. Those services are not represented as completed features in the UI.

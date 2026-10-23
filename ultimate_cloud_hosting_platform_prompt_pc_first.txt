@@ -1,0 +1,1315 @@
+ULTIMATE PROMPT — BUILD A REAL WORLD-CLASS CLOUD HOSTING PLATFORM
+
+You are building a real, production-grade cloud hosting platform, starting on MY OWN PC using its existing internal SSD/HDD for the initial control plane, database, local worker, and customer storage. The long-term ambition is to grow into one of India’s greatest hosting platforms and eventually serve customers worldwide. Treat that as the goal, not as a claim that the initial PC already provides enterprise-grade uptime or capacity.
+
+This is NOT a UI mockup, landing page, fake dashboard, or demo where buttons merely change states.
+
+Everything must be connected to a real backend architecture.
+
+The platform must be capable of actually provisioning workloads, assigning compute resources, managing containers, tracking resource consumption, enforcing plans and limits, handling storage and bandwidth, and eventually accepting real payments.
+
+The architecture must work on one PC first, with a clear, safe local setup, and later scale from one PC to additional worker servers and eventually hundreds or thousands of machines. Do not pretend that one PC is a multi-region cloud.
+
+CORE REQUIREMENTS
+
+1. REAL CONTROL PLANE + WORKER INFRASTRUCTURE
+Create a control plane responsible for authentication, users, projects, plans, billing, resource accounting, deployment requests, scheduling, server/node management, container assignment, storage, networking, domains, SSL, monitoring, usage metering, notifications and admin controls.
+
+Worker nodes must be actual physical/virtual servers that report CPU, RAM, storage, network capacity, running containers, usage, region, availability, health, Docker status and other required capabilities.
+
+2. REAL CONTAINER ORCHESTRATION
+When a user deploys:
+- Validate account and plan.
+- Check entitlement and available capacity.
+- Select an appropriate worker.
+- Reserve resources.
+- Create the workload/container.
+- Apply CPU, RAM and storage limits.
+- Configure networking, volumes, environment variables and restart policy.
+- Start it.
+- Health-check it.
+- Register it.
+- Begin metering.
+- Show live status.
+
+Use Docker initially, but create an abstraction layer so Kubernetes/containerd or another orchestrator can be introduced later.
+
+3. PLAN ENGINE
+Plans must be database-driven and configurable from the admin panel.
+
+Plan attributes can include:
+- RAM
+- CPU
+- Storage
+- Network transfer
+- Number of deployments
+- Number of containers
+- Number of projects
+- Regions
+- Backups
+- Databases
+- Domains
+- Runtime
+- Processes
+- Upload size
+- Container size
+- Bandwidth
+- Support level
+
+Never hardcode plan limits throughout the codebase.
+
+4. FREE PLAN
+Launch with a genuine free tier:
+- 512 MB RAM
+- 1 GB storage
+- Limited CPU
+- Limited monthly transfer
+- Limited workloads
+- Shared infrastructure
+- Abuse protection
+- No payment required
+
+The exact limits must be configurable.
+
+Show usage such as:
+512 MB / 512 MB RAM
+0.42 GB / 1 GB Storage
+X GB / Y GB Transfer
+
+The backend must enforce limits. Frontend manipulation must never bypass them.
+
+5. PAID PLANS
+Support configurable Starter, Developer, Pro, Business and Custom plans, without hardcoding exact prices.
+
+Users should be able to buy more:
+- RAM
+- CPU
+- Storage
+- Transfer
+- Runtime
+- Dedicated resources
+- Other add-ons
+
+6. COMPUTE-ONLY AND MIXED PRODUCTS
+Support:
+- Compute only
+- Storage only
+- Compute + storage
+- Compute + transfer
+- Compute + storage + transfer
+
+The billing and resource system must treat compute and storage as separate products.
+
+7. STORAGE
+Make storage a first-class service.
+
+Support:
+- Persistent volumes
+- Object storage
+- Application storage
+- Database storage
+- Backups
+- Minecraft worlds
+- User files
+
+Use the PC's existing internal SSD/HDD for initial local storage, with a storage abstraction that can later support dedicated storage servers, S3-compatible storage, MinIO, Ceph, cloud object storage and distributed storage.
+
+Persistent data should not be permanently tied to one physical worker.
+
+8. NETWORK TRANSFER
+Track:
+- Inbound traffic
+- Outbound traffic
+- Total transfer
+- Requests/connections where useful
+
+Plans must have configurable transfer limits and warnings.
+
+9. REAL RESOURCE METERING
+Track per user, project, deployment, worker and globally:
+- CPU usage/time
+- RAM allocation/usage
+- Storage allocation/usage
+- Network ingress/egress
+- Runtime
+- Containers
+- Deployments
+
+Use aggregation rather than storing unlimited high-frequency raw data.
+
+10. RESOURCE RESERVATION
+Do not schedule based only on total capacity.
+
+Example:
+Worker total RAM: 64 GB
+Reserved: 40 GB
+Available: 24 GB
+
+A request for 8 GB is allowed, then reserved RAM becomes 48 GB.
+
+Apply equivalent reservation concepts to CPU, storage and other constrained resources.
+
+11. REAL SCHEDULER
+Architecture:
+
+User
+↓
+API
+↓
+Control Plane
+↓
+Scheduler
+↓
+Find eligible worker
+↓
+Reserve resources
+↓
+Worker Agent
+↓
+Container Runtime
+↓
+Health Check
+↓
+LIVE
+
+Scheduler must consider capacity, region, health, load, requirements, plan restrictions and affinity/anti-affinity where appropriate.
+
+12. WORKER AGENT
+Each infrastructure server runs a secure worker agent responsible for:
+- Receiving authorized workload commands
+- Creating/starting/stopping/restarting containers
+- Collecting metrics
+- Sending logs
+- Managing volumes
+- Reporting health/capacity
+
+Workers must authenticate securely with the control plane.
+
+Never expose Docker socket or host access to customers.
+
+13. SECURITY
+Treat user code as potentially malicious.
+
+Use:
+- Container isolation
+- Non-root where possible
+- CPU/RAM/process limits
+- Storage quotas
+- Filesystem isolation
+- Network restrictions
+- Upload validation
+- Path traversal protection
+- API authentication/authorization
+- Rate limiting
+- Secure worker authentication
+- Audit logs
+- Secret protection
+- Host filesystem protection
+- Docker socket protection
+
+Design against container escapes, privilege escalation and cross-user access.
+
+14. DEPLOYMENT WIZARD
+Create flow:
+
+Step 1: What are you deploying?
+Python, Node.js, Website, Bot, Minecraft, Docker, Game Server, API, Worker, Custom
+
+Step 2: Source
+ZIP, files, GitHub, Docker image, template
+
+Step 3: Auto-detect
+Runtime, framework, dependencies, startup command, port, package manager, build command
+
+Step 4: Choose plan/resources
+Show CPU, RAM, storage and transfer
+
+Step 5: Region
+India, Singapore, Germany, UK, US, Australia, etc., but only show regions that actually exist
+
+Step 6: Review
+Plan, CPU, RAM, storage, transfer, region, estimated price
+
+Step 7: Deploy
+Actually provision the workload.
+
+15. BILLING ENGINE
+Build billing as a real backend subsystem even if payment is initially disabled.
+
+Support:
+- Fixed monthly subscriptions
+- Usage-based billing
+- CPU
+- RAM
+- Storage
+- Bandwidth
+- Runtime
+- Dedicated resources
+- Add-ons
+
+Support future Indian and international payment providers.
+
+Never trust frontend usage data. Billing must use server-side metering.
+
+16. SIDEBAR
+Persistent navigation:
+
+OVERVIEW
+- Dashboard
+
+HOST
+- Minecraft
+- Python
+- Node.js
+- Websites
+- Bots
+- Game Servers
+- Docker
+- Scripts
+- APIs
+- Workers
+- Databases
+- Custom
+
+PROJECTS
+- All Projects
+- Favorites
+- Recent
+
+INFRASTRUCTURE
+- Servers
+- Monitoring
+- Network
+- Storage
+- Regions
+
+ACCOUNT
+- Billing
+- Usage
+- Settings
+- Security
+
+17. DASHBOARD
+Dashboard is the default page.
+
+Show:
+- Running workloads
+- Total projects
+- CPU
+- RAM
+- Storage
+- Network
+- Server health
+- Recent deployments
+- Activity
+- Failures
+- Resource warnings
+- Quick deploy
+
+Example:
+RAM: 1.8 GB / 4 GB
+Storage: 6.2 GB / 20 GB
+Transfer: 42 GB / 100 GB
+Services: 7 Running / 1 Stopped
+
+18. PROJECT DASHBOARD
+Every workload gets:
+- Overview
+- Console
+- Logs
+- Files
+- Deployments
+- Monitoring
+- Environment
+- Networking
+- Storage
+- Backups
+- Settings
+
+Actions:
+- Start
+- Stop
+- Restart
+- Redeploy
+- Delete
+- Scale
+- Backup
+
+19. REAL CONSOLE
+Provide live logs, search, clear, download, timestamps, errors, auto-scroll, pause and reconnect.
+
+Provide controlled terminals where appropriate, never unrestricted host access.
+
+20. FILE MANAGER
+Real project files:
+- Upload
+- Download
+- Rename
+- Delete
+- Create folder/file
+- Edit
+- Search
+- Drag/drop
+- Storage usage
+
+Minecraft should expose worlds, plugins, mods, configs and server properties.
+
+21. PYTHON HOSTING
+Detect:
+- requirements.txt
+- pyproject.toml
+- Pipfile
+- main.py
+- app.py
+
+Support Flask, FastAPI, Django, Discord bots, Telegram bots, workers, scripts and scheduled jobs.
+
+Suggest Python version, install command, startup command and port.
+
+22. NODE.JS HOSTING
+Detect:
+- package.json
+- Node version
+- npm/pnpm/yarn
+- build command
+- startup command
+- port
+
+Support Express, Next.js, APIs, bots, workers and custom apps.
+
+23. WEBSITE HOSTING
+Support:
+- HTML/CSS/JS
+- React
+- Vue
+- Angular
+- Next.js
+- Static and full-stack sites
+
+Provide deployment history, build logs, previews, custom domains, HTTPS, SSL and analytics.
+
+Give deployments a temporary platform URL.
+
+24. MINECRAFT HOSTING
+Real Minecraft provisioning.
+
+Support Java Edition and Bedrock where technically supported, versions, RAM, CPU, storage, backups, console, files, plugins, mods, players, worlds and startup configuration.
+
+Usage must count against the user's plan.
+
+25. DOCKER HOSTING
+Support Dockerfiles, Docker images, Docker Hub, private registries and uploaded projects.
+
+Configure ports, volumes, environment variables, CPU, RAM, storage and restart policy.
+
+26. CUSTOM DOMAINS
+Support domain verification, DNS instructions, routing, HTTPS, SSL and certificates.
+
+Architect around a reverse proxy such as Traefik, Caddy or Nginx.
+
+27. MONITORING
+Real charts for CPU, RAM, storage, network, requests and uptime.
+
+Ranges:
+1h, 6h, 24h, 7d, 30d
+
+28. CRASH RECOVERY
+Detect crashes, collect logs, apply restart policy, restart when allowed, health-check, record events and notify users.
+
+Prevent infinite restart loops.
+
+29. BACKUPS
+Support manual, automatic and scheduled backups, restore and retention policies.
+
+30. ADMIN PANEL
+Show:
+- Users
+- Active users
+- Workloads
+- Servers
+- Regions
+- CPU
+- RAM
+- Storage
+- Network
+- Deployments
+- Errors
+- Revenue
+- Resource utilization
+
+Allow admins to:
+- Suspend/restore users
+- Change plans/limits
+- Stop/restart workloads
+- Inspect logs
+- Manage servers/regions
+- Add/remove workers
+- Manage plans/pricing
+- Configure resource limits
+
+31. MULTI-REGION INFRASTRUCTURE
+Do not hardwire the architecture to a single server, but DO make the first runnable deployment on my own PC. Clearly separate the initial single-PC deployment from the future multi-server production architecture.
+
+Support:
+
+CONTROL PLANE
+|
++-- INDIA
+|   +-- Worker 01
+|   +-- Worker 02
+|   +-- Worker 03
+|
++-- SINGAPORE
+|   +-- Worker 01
+|   +-- Worker 02
+|
++-- EUROPE
+    +-- Worker 01
+    +-- Worker 02
+
+Track workload ownership, region, available resources, reserved resources, node health and workload health.
+
+Design for horizontal scaling from the beginning.
+
+32. DATABASE
+Use PostgreSQL or another production-grade relational database, running locally on my own PC for the first version. Its database files may reside on my internal SSD/HDD; no separate paid database service is required to get started.
+
+Models should include:
+- Users
+- Organizations
+- Projects
+- Deployments
+- Workloads
+- Containers
+- Plans
+- Subscriptions
+- Resources
+- Worker Nodes
+- Regions
+- Environment Variables
+- Domains
+- Storage Volumes
+- Backups
+- Usage Records
+- Network Usage
+- Billing Records
+- Notifications
+- Audit Logs
+- Settings
+
+Use migrations.
+
+33. API ARCHITECTURE
+Use:
+
+Frontend
+↓
+API
+↓
+Control Plane
+↓
+Scheduler
+↓
+Worker Agent
+↓
+Container Runtime
+↓
+User Workload
+
+The browser must never directly control infrastructure.
+
+34. NOTIFICATIONS
+Support deployment success/failure, crashes, restarts, storage warnings, resource warnings, backups, maintenance and billing events.
+
+35. GLOBAL SEARCH
+Ctrl+K / Cmd+K command palette.
+
+Search projects, servers, deployments, settings, files and categories.
+
+Commands such as:
+- Deploy new project
+- Open Minecraft
+- Restart bot
+- View logs
+- Open server
+- Create backup
+- Settings
+
+36. WORLD-CLASS UI
+Quality bar: Apple, Vercel, Linear, Stripe, Cloudflare, Raycast and modern developer platforms.
+
+Create an original identity.
+
+Feel:
+- Premium
+- Fast
+- Technical
+- Clean
+- Powerful
+- Trustworthy
+- Modern
+
+Avoid generic Bootstrap dashboards, excessive gradients, gaming neon, clutter, cheap animations and template-looking pages.
+
+37. MOBILE + ACCESSIBILITY
+Support desktop, laptop, tablet and mobile.
+
+Use responsive navigation/drawers.
+
+Support keyboard navigation, focus states, screen readers, contrast, reduced motion, semantic HTML and accessible forms.
+
+38. OBSERVABILITY
+Monitor:
+- API latency/errors
+- Scheduler failures
+- Worker health
+- Deployment failures
+- Queue length
+- Database health
+- Storage health
+- Network health
+
+Create internal logs and metrics.
+
+39. QUEUE SYSTEM
+Use a queue for long-running work such as:
+- Deployments
+- Builds
+- Backups
+- Container creation
+- File operations
+- Scheduled jobs
+- Reconciliation
+
+Redis or another appropriate system may be used.
+
+40. STATE RECONCILIATION
+Detect discrepancies between database state and actual worker/container state and reconcile them.
+
+Example:
+Database: RUNNING
+Worker: STOPPED
+
+Do not assume infrastructure never fails.
+
+41. FAILURE HANDLING
+Design for:
+- Worker crash
+- Network failure
+- Database failure
+- Container crash
+- Deployment failure
+- Storage failure
+- Control-plane restart
+- Worker reconnect
+- Duplicate requests
+- Partial deployments
+- Timeouts
+- Cancellation
+
+Make operations idempotent where appropriate.
+
+42. SECRET SECURITY
+Support encrypted secret storage, masked display, rotation, access control and no secret logging/frontend leakage.
+
+43. FUTURE PRODUCTS
+Architect for:
+- VPS
+- GPU hosting
+- Managed PostgreSQL/MySQL/Redis/MongoDB
+- S3-compatible object storage
+- CDN
+- Serverless
+- Managed Kubernetes
+- AI model hosting
+- More game servers
+
+44. INDIA-FIRST ARCHITECTURE
+Prioritize:
+- India regions
+- INR pricing
+- Indian payment systems
+- GST-ready billing
+- Indian users
+- Low-latency Indian hosting
+- Indian support
+- International expansion
+
+45. BUSINESS MODEL
+Support:
+- Subscriptions
+- Usage-based pricing
+- Storage/transfer/CPU/RAM add-ons
+- Dedicated infrastructure
+
+46. FIRST VERSION MUST WORK
+Implement:
+- Authentication
+- Dashboard
+- Sidebar
+- HOST categories
+- Projects
+- Plans
+- Free 512 MB RAM / 1 GB storage
+- User registration
+- Deployment system
+- ZIP upload
+- Project detection
+- Python
+- Node
+- Website
+- Docker
+- Minecraft architecture
+- Worker node
+- Container provisioning
+- CPU/RAM limits
+- Storage limits
+- Start/stop/restart
+- Logs
+- Console
+- Files
+- Environment variables
+- Monitoring
+- Usage metering
+- Resource accounting
+- Server management
+- Admin panel
+- Notifications
+- Database
+- Security
+- Responsive UI
+- Dark/light mode
+- Search
+- Command palette
+
+Do not merely create screens for these. Connect them to real backend functionality.
+
+47. DEVELOPMENT ENVIRONMENT
+Make initial setup easy.
+
+A single Python entry point may be used for an initial prototype if genuinely practical, but do not destroy the production architecture merely to force everything into one file.
+
+If multiple services/files are required, use a clean structure such as:
+
+cloud-platform/
+├── frontend/
+├── api/
+├── scheduler/
+├── worker/
+├── database/
+├── infrastructure/
+├── migrations/
+├── docker/
+├── shared/
+└── README.md
+
+The architecture must remain capable of evolving into production.
+
+48. LOCAL DEVELOPMENT MODE
+If real multi-server infrastructure is unavailable locally:
+- Create a local worker
+- Simulate multiple nodes where appropriate
+- Run real containers where safe
+- Use real database logic
+- Use real API logic
+- Use real resource accounting
+
+Clearly separate development/mock infrastructure from production infrastructure.
+
+49. PRODUCTION DEPLOYMENT
+Provide clear instructions for deploying the platform itself, including:
+- Required servers
+- Ports
+- Database
+- Redis/queue
+- Worker installation
+- Reverse proxy
+- SSL
+- Environment variables
+- Secrets
+- Backups
+- Monitoring
+
+Adding a physical server should eventually work like:
+
+Add Worker Node
+↓
+Install Worker Agent
+↓
+Authenticate
+↓
+Node appears in dashboard
+↓
+Scheduler can assign workloads
+
+50. NEVER HARD-CODE INFRASTRUCTURE
+Never assume a fixed server size.
+
+Worker nodes must report actual capabilities.
+
+Plans determine allowed resources.
+
+Scheduler calculates capacity dynamically.
+
+51. SERVER-SIDE RESOURCE ENFORCEMENT
+If a Free user has 512 MB RAM and 1 GB storage, they must not be able to request 4 GB RAM and 20 GB storage by modifying frontend requests.
+
+The backend must reject it.
+
+CPU, transfer, workload count, storage, ports and runtime must also be enforced server-side.
+
+52. ADMIN RESOURCE CONTROL
+Admins must be able to change plan limits without modifying source code.
+
+Example:
+Free
+RAM: 512 MB
+Storage: 1 GB
+Transfer: 10 GB
+CPU: 0.25
+
+can later become:
+RAM: 1 GB
+Storage: 2 GB
+Transfer: 20 GB
+CPU: 0.5
+
+53. BILLING + RESOURCE ACCOUNTING
+When a user upgrades:
+Free
+↓
+Paid Plan
+
+The platform should:
+1. Confirm payment/subscription.
+2. Update account entitlement.
+3. Increase resource limits.
+4. Allow larger workloads.
+5. Update billing state.
+6. Record transaction.
+7. Generate usage information.
+
+On expiry:
+- Apply configurable grace period
+- Notify user
+- Restrict new deployments
+- Handle existing workloads according to policy
+- Never unexpectedly delete user data
+
+54. ANTI-ABUSE
+Implement:
+- Rate limiting
+- Email verification
+- Deployment limits
+- Resource limits
+- Process limits
+- Network restrictions
+- Abuse/malware detection architecture
+- Account suspension
+- Appropriate IP/device abuse controls
+- Audit logs
+- Suspicious activity detection
+- Admin review tools
+
+Do not make free hosting an unrestricted anonymous compute farm.
+
+55. FINAL QUALITY REQUIREMENT
+Do not stop at the dashboard.
+
+Do not create fake buttons.
+Do not use static sample metrics where real data should exist.
+Do not hardcode fake server capacity.
+Do not make animations pretend something happened.
+Do not make every category a copy of the same page.
+Do not build a beautiful frontend with a fake backend.
+
+Build the actual foundation of a cloud hosting company.
+
+The target flow is:
+
+User
+↓
+Create Project
+↓
+Choose Python
+↓
+Upload ZIP
+↓
+Platform analyzes project
+↓
+User chooses Free / Paid Plan
+↓
+Backend checks resources
+↓
+Scheduler finds worker
+↓
+Resources reserved
+↓
+Container created
+↓
+Storage attached
+↓
+Network configured
+↓
+Application starts
+↓
+Health check
+↓
+LIVE
+↓
+Usage continuously measured
+↓
+Dashboard updated
+
+INFRASTRUCTURE:
+
+CLOUD CONTROL PLANE
+|
++-- INDIA
+|   +-- Worker 01
+|   +-- Worker 02
+|   +-- Worker 03
+|
++-- SINGAPORE
+|   +-- Worker 01
+|   +-- Worker 02
+|
++-- EUROPE
+    +-- Worker 01
+    +-- Worker 02
+
+The system must know:
+- Which node owns a workload
+- Which region it belongs to
+- What resources are available
+- What resources are reserved
+- Node health
+- Workload health
+
+Build the architecture so it can grow from:
+1 server → 10 servers → 100 servers → 1,000+ servers
+
+without rewriting the entire platform.
+
+FINAL INSTRUCTION
+
+I am not asking for a toy hosting dashboard.
+
+I am building a serious company.
+
+The long-term goal is to build an India-first, globally scalable cloud hosting platform where customers can deploy applications, websites, bots, game servers, containers, databases, compute workloads, storage, and eventually GPU/AI infrastructure.
+
+The product must combine:
+
+World-class UI + real backend + real infrastructure + real containers + real resource allocation + real storage + real networking + real monitoring + real usage metering + real plans + real billing architecture + serious security.
+
+Make every architectural decision with the question:
+
+“Could this eventually operate at the scale of a major Indian cloud hosting company?”
+
+If the answer is no, redesign it.
+
+Build the foundation correctly from the beginning.
+
+
+ADDITIONAL COMPLETION: BUSINESS MODEL, IMPLEMENTATION RULES, AND ACCEPTANCE TESTS
+
+BUSINESS MODEL — FULL REQUIREMENTS
+
+Support multiple independent and combinable revenue models:
+- Free tier for eligible workloads with strict anti-abuse limits.
+- Fixed monthly or annual subscriptions.
+- Usage-based billing for metered CPU, RAM, runtime, storage, transfer, requests, and other billable resources.
+- Compute-only products.
+- Storage-only products.
+- Compute plus storage bundles.
+- Compute plus bandwidth/transfer bundles.
+- Dedicated CPU/RAM and dedicated infrastructure.
+- Optional backups, snapshots, extra volumes, extra transfer, domains, and other add-ons.
+- Managed database products and future GPU/AI products.
+- Custom enterprise contracts and negotiated quotas.
+
+Represent product entitlements and metered usage separately. A plan or purchased add-on grants an entitlement; the usage system records measured consumption; the billing engine calculates charges from server-side records. Keep pricing, currencies, billing intervals, taxes, quotas, included allowances, overage rules, grace periods, and suspension behavior configurable in the database/admin panel rather than scattered through code.
+
+Support INR-first pricing and architecture for international currencies. Keep the system GST-ready, with invoices, transaction records, tax configuration, subscription state, payment status, refunds/credits where applicable, and auditable billing history. Do not invent payment success. When payment integration is disabled, clearly label billing as unavailable/test mode and do not unlock paid entitlements as if real payment had succeeded.
+
+Define safe subscription lifecycle behavior:
+- Upgrade: verify payment or authorized admin action on the server, update entitlements, record the event, and recalculate permitted resources.
+- Downgrade: explain any resource overage and use a configured policy; do not silently destroy data.
+- Payment failure/expiry: notify the user, apply a configurable grace period, restrict new deployments where appropriate, and apply an explicit policy to existing workloads.
+- Cancellation: record the effective date and preserve user data according to the published retention policy.
+- Usage overage: warn users and apply the configured hard cap, throttling, or billable-overage policy.
+- Never trust prices, usage, payment status, or entitlement values supplied by the browser.
+
+IMPLEMENTATION AND AGENT WORKFLOW
+
+Before coding, inspect the existing repository and identify its language, framework, entry points, architecture, dependencies, tests, and current working features. Preserve working functionality unless there is a documented reason to change it. Do not replace the project with a fresh scaffold simply because that is easier.
+
+Then:
+1. Write a concise implementation plan and identify infrastructure prerequisites.
+2. Build the system in coherent vertical slices, connecting UI, API, database, background jobs, and worker operations for each feature.
+3. Start with a runnable local development setup and a real database/API. Use an explicitly named development worker or safe local mode when real worker infrastructure is not available.
+4. Implement migrations, validation, authorization, error handling, logging, and tests as each feature is added.
+5. Run formatting, linting, type checks, unit tests, integration tests, and available end-to-end tests. Fix failures instead of merely reporting them.
+6. Start the application and verify the main user flows where the environment permits.
+7. Keep documentation, environment examples, setup instructions, migration instructions, and deployment instructions current.
+8. Commit changes in logical units if repository tooling and user permissions allow. Do not claim that code was pushed or deployed unless that action actually succeeded.
+9. If credentials, payment-provider accounts, domain records, cloud servers, or other external resources are missing, implement the integration boundary and clearly document the exact configuration still required. Never fabricate credentials or claim a real external integration is live when it is not.
+10. Continue working through the repository rather than stopping after producing a plan or a polished landing page. If context or execution limits interrupt work, leave a clear progress note with completed items, remaining items, test status, and the next exact step.
+
+ACCEPTANCE TESTS — THE PLATFORM IS NOT COMPLETE UNTIL THESE ARE VERIFIED
+
+Authentication and authorization:
+- A user can register, sign in, sign out, and access only their own authorized resources.
+- Requests without valid authentication are rejected where authentication is required.
+- A user cannot read, change, stop, inspect, or delete another user's project by changing an ID in a URL or API request.
+- Administrative operations require explicit administrator authorization and are audit logged.
+
+Plans and enforcement:
+- A new free account receives the configured default free entitlements, initially 512 MB RAM and 1 GB storage.
+- The server rejects a deployment that exceeds the user's RAM, CPU, storage, transfer, process, or workload limits, even if the client manually edits the request.
+- Changing a plan in the admin panel updates the authoritative entitlement without requiring source-code edits.
+- Resource usage shown in the dashboard is derived from backend records, not hardcoded sample values.
+
+Deployment lifecycle:
+- A supported project can be uploaded or connected, inspected, validated, assigned a plan, scheduled, provisioned, health-checked, and shown as live only after successful verification.
+- A failed build or container start produces a useful error state and logs rather than a fake success animation.
+- Start, stop, restart, redeploy, and delete operations update both control-plane state and actual worker state.
+- Repeated requests do not accidentally create duplicate workloads; long-running actions use jobs and idempotency where appropriate.
+
+Scheduling and capacity:
+- A worker with insufficient unreserved resources is not selected.
+- Resource reservations are atomic or otherwise concurrency-safe so simultaneous deployments cannot over-allocate capacity.
+- Unhealthy or disconnected workers are excluded from new placement until healthy again.
+- The scheduler records why a workload could not be placed and returns an understandable error.
+
+Storage and networking:
+- A workload's persistent files survive a container restart.
+- Persistent data is not treated as permanently tied to ephemeral container storage.
+- Storage quota checks occur on the backend.
+- Network usage is measured by trusted infrastructure or worker-side instrumentation.
+- Domains and HTTPS are shown as active only after verification and successful routing/certificate setup.
+
+Monitoring and recovery:
+- CPU, RAM, storage, network, uptime, logs, and workload state are populated from real telemetry when infrastructure is connected.
+- A worker disconnect or container crash is recorded and handled according to the configured policy.
+- Reconciliation detects control-plane/worker state mismatches and resolves or surfaces them safely.
+- Repeated failures do not create endless restart loops.
+
+Security:
+- Customer workloads do not receive the host Docker socket or unrestricted host filesystem access.
+- Secrets are not exposed in API responses, frontend bundles, logs, or error traces.
+- Upload paths and archive extraction are protected against traversal and unsafe file handling.
+- API rate limits and input validation are active on sensitive endpoints.
+- Worker-to-control-plane communication is authenticated and authorized.
+
+Operations:
+- The documented local setup works from a clean environment using the supplied configuration example.
+- Database migrations run successfully.
+- Background workers and queues can be started and their health observed.
+- The README distinguishes local/development mode from production infrastructure.
+- Production instructions cover TLS, secrets, database, queue, worker installation, network ports, backups, monitoring, and recovery.
+
+UI QUALITY AND HONESTY
+
+Every visible button must either perform its real action or be clearly disabled with an explanation while its backend dependency is unavailable. Loading, empty, success, and error states must reflect actual operations. Use realistic loading indicators, but never use animations to pretend a deployment, payment, backup, or provisioning operation succeeded. Do not show fabricated live server capacity, fabricated revenue, or fabricated user activity in production views. Seeded demo data may be used only in an explicitly labeled demo/development environment.
+
+DELIVERY EXPECTATIONS
+
+Deliver a working repository, not just a design concept. Include:
+- Source code and a clear directory structure.
+- Database schema and migrations.
+- API and background-job implementation.
+- Worker agent/runtime integration or a clearly bounded development worker implementation.
+- Automated tests for security, entitlements, scheduling, and core deployment flows.
+- A sample environment file containing placeholders only, never real secrets.
+- Setup and troubleshooting documentation.
+- Production deployment and worker-node onboarding documentation.
+- A list of implemented features, partially implemented integrations, known limitations, and exact remaining infrastructure prerequisites.
+
+Do not claim that the system is production-ready merely because it runs locally. Explicitly distinguish features verified locally, features verified against real infrastructure, and features that still require external infrastructure or security review.
+
+END OF COMPLETE MASTER PROMPT
+
+
+
+===============================================================================
+CRITICAL UPDATE — INITIAL DEPLOYMENT MUST RUN ON MY OWN PC
+THIS SECTION OVERRIDES ANY EARLIER WORDING THAT ASSUMES I ALREADY OWN CLOUD
+SERVERS, MULTIPLE REGIONS, A DEDICATED STORAGE CLUSTER, OR PAID CLOUD SERVICES.
+===============================================================================
+
+MY ACTUAL STARTING POINT
+
+I am initially going to run this platform on my own PC. Use the PC's existing
+internal SSD/HDD for application files, PostgreSQL data, customer uploads,
+workload volumes, build artifacts, and local backups where appropriate. Do not
+make a paid cloud database, paid object-storage account, Kubernetes cluster, or
+multiple remote servers a prerequisite for the first working version.
+
+Before choosing final resource limits, inspect the actual development PC's OS,
+CPU, RAM, free disk capacity, Docker availability, network configuration, and
+other relevant capabilities if tools/access permit. Never invent or assume
+hardware specifications. If you cannot inspect them, provide commands for me to
+run and use configurable values rather than pretending to know the hardware.
+
+The first release must have two clearly separated operating modes:
+
+1. LOCAL DEVELOPMENT MODE:
+   - Runs on my PC and is easy to start and stop.
+   - Uses a local PostgreSQL instance or a documented local PostgreSQL container.
+   - Uses the PC's local disk for initial storage.
+   - Uses a real local worker and real containers where Docker and the host OS
+     support them safely.
+   - Uses real API, authentication, database migrations, plan enforcement,
+     resource accounting, and workload state.
+   - May include an explicitly labelled simulated worker for scheduler tests,
+     but simulated capacity must never be shown as real production capacity.
+   - Is suitable for development and private testing, not automatically
+     advertised as production-grade public hosting.
+
+2. PUBLIC/BETA HOSTING MODE:
+   - Can accept external users only after the operator explicitly configures
+     authentication, abuse controls, secure ingress, TLS, firewall rules,
+     backups, resource caps, logging, and an appropriate network setup.
+   - Clearly warns that one PC, one disk, home power, and a residential
+     connection are single points of failure.
+   - Must not expose the development machine, its admin account, Docker socket,
+     SSH, PostgreSQL port, or unrestricted host shell directly to the internet.
+   - Must not silently expose the service publicly just because it starts locally.
+   - Provide a deliberate setup checklist and require explicit configuration
+     before public registration/deployments are enabled.
+
+LOCAL PC ARCHITECTURE
+
+For the initial version, run these components on the same PC if the hardware
+allows:
+
+- Web frontend
+- API/control plane
+- Scheduler
+- Background job worker/queue
+- PostgreSQL
+- Local worker agent
+- Docker/container runtime
+- Local storage manager
+- Reverse proxy for local development, if needed
+- Monitoring and structured logs
+
+Keep these components logically separated in the code and configuration even
+when they run on one machine. Use Docker Compose or another maintainable local
+orchestration approach where appropriate. Provide one documented command or
+script to start the local stack, one to stop it safely, and clear health checks.
+Do not force everything into one giant source file.
+
+Use environment variables and a safe example environment file. Never commit real
+passwords, tokens, signing keys, payment credentials, or other secrets. Provide
+clear instructions for generating local secrets.
+
+LOCAL DISK AND STORAGE REQUIREMENTS
+
+- Use my existing internal SSD/HDD; do not require a separate storage provider
+  for the initial release.
+- Configure a clear storage root directory on the local disk, with separate
+  subdirectories or volumes for application data, customer files, workload
+  volumes, build cache, database data, logs, and backups.
+- Keep PostgreSQL data separate from customer-upload directories. Use normal
+  filesystem permissions and volume boundaries; do not let workloads browse the
+  database directory or another customer's files.
+- Do not count PostgreSQL files, logs, build cache, reserved system space, and
+  customer data as if all of them were freely available customer storage.
+- Calculate usable storage from real disk capacity and free space. Reserve a
+  configurable safety margin for the OS, database, logs, image layers, updates,
+  and emergency operations. Never allocate the full physical disk to customers.
+- Enforce per-account, per-project, and per-workload storage quotas on the
+  backend. Validate archive extraction, file paths, file sizes, and disk usage.
+- Handle disk-full conditions safely: stop accepting new allocations, show a
+  clear alert, preserve database integrity, and avoid corrupting existing data.
+- Persistent workload data must survive normal container restarts and rebuilds.
+- Make the storage layer replaceable later with a storage server or S3-compatible
+  service without rewriting all business logic.
+- Local backups on the same disk are useful for recovery from some mistakes but
+  are NOT protection against disk failure, theft, fire, or total PC failure.
+  Document and support export/off-site backup to a separate device or location.
+  Do not claim backups are safe until a restore test succeeds.
+
+POSTGRESQL ON MY OWN PC
+
+- PostgreSQL may run locally and store its data on my existing internal disk.
+  I do not need a separately hosted database to start.
+- Use schema migrations, indexes, constraints, transactions, backups, and
+  database connection management.
+- Keep database credentials private and bind the database to localhost or a
+  private container network by default; do not expose its port publicly.
+- Do not use an in-memory database as the authoritative store for accounts,
+  plans, workloads, or billing.
+- Explain how to back up and restore the local database and how to move it to a
+  dedicated database server later.
+
+IMPORTANT NETWORKING REALITY FOR PUBLIC CUSTOMERS
+
+A website running on my PC is not automatically reachable worldwide. Before
+public customers can use it, explain and verify the network requirements:
+- Public IP address or a supported secure tunnel/reverse-proxy arrangement.
+- Whether my ISP uses CGNAT and whether inbound connections are possible.
+- Dynamic-IP handling if the public address changes.
+- Domain DNS and HTTPS/TLS.
+- Firewall rules and only the minimum required open ports.
+- Upload/download capacity and ISP terms.
+- DDoS exposure, abuse complaints, and how to disable public access quickly.
+- Power, cooling, hardware reliability, and internet uptime.
+
+Do not assume I have a static IP, port forwarding, a business internet plan, or
+a public IPv4 address. Do not invent a successful connectivity test. Give me
+specific checks and explain the results.
+
+For local development, bind services to localhost by default. For public testing,
+prefer a carefully configured, authenticated tunnel or a hardened reverse proxy
+where suitable, and document its trade-offs. Never tell me to expose Docker,
+PostgreSQL, SSH, or the worker agent directly to the internet.
+
+ONE PC IS NOT YET A RELIABLE PUBLIC CLOUD
+
+Design a staged path:
+
+Stage 1 — Local foundation:
+- One PC, one local database, local storage, local worker, real containers.
+- Build and test authentication, project creation, deployment, resource limits,
+  logs, storage quotas, plans, metering, admin tools, and recovery.
+- Keep public user signups disabled by default.
+
+Stage 2 — Private alpha:
+- Only trusted testers.
+- Strict workload, CPU, RAM, process, disk, network, and account limits.
+- Clear data-loss/availability warning.
+- Tested backup and restore process.
+- Monitoring, security updates, audit logs, and an emergency shutdown process.
+
+Stage 3 — Small public beta:
+- Proceed only when the network, security, legal/ISP terms, abuse response,
+  backup, monitoring, and recovery requirements have been reviewed.
+- Make limits reflect actual free capacity after reserving resources for the
+  operating system, control plane, database, Docker, and maintenance.
+- Do not promise enterprise uptime or global regions from one home PC.
+- Avoid high-risk public arbitrary-code hosting until isolation has received
+  serious security review.
+
+Stage 4 — Add worker servers:
+- Register each additional physical/virtual worker using secure enrollment.
+- Worker reports real CPU, RAM, disk, region, health, and available capacity.
+- Scheduler places workloads only on eligible workers.
+- Separate workload metadata from physical-node identity.
+- Add shared/remote persistent storage only when needed and configured.
+- Support draining a worker before maintenance and handling a lost worker.
+
+Stage 5 — Professional hosting infrastructure:
+- Move critical control-plane/database components to reliable infrastructure
+  when justified by growth.
+- Add independent storage and off-site backups.
+- Add real regions only after deploying and testing actual nodes in those regions.
+- Add redundancy, monitoring, incident response, network protection, capacity
+  planning, service-level objectives, and a documented disaster-recovery plan.
+- Scale from measured demand rather than pretending that a single PC has
+  hundreds of servers' capacity.
+
+RESOURCE SCHEDULING ON A SINGLE PC
+
+The scheduler must distinguish physical capacity from capacity available to
+customer workloads. Reserve configurable CPU/RAM/disk headroom for the OS,
+frontend, API, database, queue, Docker, logs, builds, monitoring, and emergency
+operations. Query actual worker capacity where possible. Do not allocate the
+same RAM, CPU, or disk space to multiple workloads as though it were unreserved.
+
+The 512 MB RAM / 1 GB storage free plan describes a customer's maximum
+entitlement, not a guarantee that every account can run simultaneously. The
+scheduler must check both the account's entitlement and actual remaining host
+capacity before deployment. If capacity is unavailable, queue or reject the
+deployment with a clear reason rather than overcommitting silently.
+
+Make per-workload CPU, memory, process, disk, file-size, runtime, concurrency,
+build-resource, and network limits configurable and enforce them at the backend
+and runtime layers where supported. Clearly distinguish hard-enforced limits
+from estimated or not-yet-implemented measurements.
+
+SECURITY REQUIREMENTS FOR A PERSONAL PC HOSTING WORKLOADS
+
+Treat arbitrary customer code as hostile. A container alone is not a guarantee
+against all isolation failures. Do not run customer workloads with privileged
+container mode, host networking, host filesystem mounts, Docker socket access,
+or unrestricted Linux capabilities. Use non-root containers and hardened
+runtime defaults where supported. Apply seccomp/AppArmor or equivalent controls
+where available, drop unnecessary capabilities, isolate networks, block access
+to host services and cloud/local metadata endpoints, and limit outbound traffic
+where feasible.
+
+Do not allow public users to run arbitrary privileged Docker images or arbitrary
+host commands. Add quotas, rate limits, account verification appropriate to the
+risk, abuse reporting, suspension tools, audit trails, and a documented response
+process. For a first public release, it is acceptable to limit supported runtimes
+and image sources rather than pretend unrestricted secure hosting is complete.
+
+Do not store uploaded projects or execute builds as the same unrestricted user
+that administers the PC. Do not place secrets in images, logs, source control,
+or client-side bundles. Keep administrative interfaces private and protected
+with strong authentication.
+
+IMPLEMENTATION PRIORITIES
+
+Build in stages and keep the app runnable after each stage:
+
+1. Inspect the existing repository and PC environment; preserve useful code.
+2. Establish a clean project structure, configuration, PostgreSQL migrations,
+   authentication, authorization, and automated tests.
+3. Build the premium dashboard and navigation connected to real APIs.
+4. Implement plans and server-side entitlements, including the 512 MB / 1 GB
+   default free plan.
+5. Implement local storage roots, quotas, upload validation, and persistence.
+6. Implement the local worker and real Docker lifecycle for a narrow supported
+   workload type, with safe resource limits.
+7. Add a complete deployment job lifecycle, logs, health checks, cancellation,
+   idempotency, and failure states.
+8. Add Python and Node.js hosting, then static websites and other workload types.
+9. Add metering, monitoring, admin controls, backups, and restore tests.
+10. Add domains/TLS and public access only after networking and security setup.
+11. Add Minecraft and other game hosting only when required runtimes, networking,
+    licensing, resource enforcement, and operational controls are implemented.
+12. Add paid billing only after server-side metering, invoice records, provider
+    webhooks, signature verification, idempotency, and entitlement updates work.
+13. Add remote worker enrollment and multi-region features as actual infrastructure
+    becomes available.
+
+Do not claim a category is supported merely because its menu item exists. Each
+category must be labelled as available, in development, or unavailable based on
+its actual implemented backend and runtime support.
+
+TESTS SPECIFIC TO MY PC
+
+- The complete stack starts from the documented instructions on my PC.
+- The application reports real local worker health and real usable disk space.
+- PostgreSQL persists users, plans, projects, and workload state across restarts.
+- A test user cannot exceed the 512 MB RAM / 1 GB storage entitlement by editing
+  an API request.
+- Two simultaneous deployments cannot reserve the same final capacity.
+- A workload's persistent files survive container restart and redeployment where
+  the documented persistence policy promises that.
+- Another account cannot read or modify the workload's files.
+- Disk-full and worker-disconnect cases fail safely and produce useful alerts.
+- Backup and restore are tested, with the backup destination clearly identified.
+- Public ingress is disabled by default and no internal administrative service
+  is unintentionally reachable from the internet.
+- The UI never claims a workload is live before a real health check succeeds.
+- The README clearly distinguishes features verified on this PC from features
+  requiring additional servers or external services.
+
+FINAL PRODUCT VISION
+
+Build toward the ambition of becoming one of India's greatest hosting platforms,
+but do so through reliable engineering, transparent limits, security, fair
+pricing, useful support, and real measured uptime. The first PC is the starting
+point and development/alpha environment, not the final infrastructure promise.
+Do not fabricate users, server capacity, uptime, regions, revenue, or feature
+readiness. Build a trustworthy foundation that can grow into a serious hosting
+company as real hardware, network capacity, funding, and operational capability
+are added.
+
+END OF PC-FIRST UPDATE

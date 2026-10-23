@@ -1,10 +1,15 @@
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, request, jsonify, session
 from .db import get_db, dict_from_row, init_db, get_plan, get_user_usage, VOLUMES_DIR, UPLOADS_DIR
 from . import docker_worker
 from datetime import datetime
 import os
+import zipfile
+import shutil
 
 api = Blueprint("api", __name__, url_prefix="/api")
+
+# Simple local secret (change in production)
+LOCAL_SECRET = os.environ.get("HOSTING_SECRET", "local-pc-secret")
 
 @api.before_app_request
 def ensure_db():
@@ -17,6 +22,24 @@ def health():
         "mode": "local-pc",
         "message": "Control plane running on this machine"
     })
+
+@api.route("/auth/login", methods=["POST"])
+def login():
+    data = request.get_json() or {}
+    # Local mode: any email + secret works for now
+    email = data.get("email", "local@pc")
+    secret = data.get("secret", "")
+    if secret != LOCAL_SECRET and secret != "":
+        return jsonify({"error": "Invalid secret"}), 401
+    session["user_id"] = 1
+    session["email"] = email
+    return jsonify({"ok": True, "user": {"id": 1, "email": email, "plan": "Free"}})
+
+@api.route("/auth/me")
+def me():
+    if not session.get("user_id"):
+        return jsonify({"authenticated": False})
+    return jsonify({"authenticated": True, "user": {"id": 1, "email": session.get("email", "local@pc")}})
 
 @api.route("/status")
 def status():
@@ -33,7 +56,8 @@ def status():
         "projects": projects,
         "plan": plan,
         "usage": usage,
-        "mode": "Local PC"
+        "mode": "Local PC",
+        "authenticated": bool(session.get("user_id"))
     })
 
 @api.route("/plans")
@@ -58,6 +82,7 @@ def create_project():
     ram_mb = int(data.get("ram_mb", 512))
     storage_mb = int(data.get("storage_mb", 1024))
     image = data.get("image", "python:3.11-slim")
+    zip_filename = data.get("zip_filename")
 
     plan = get_plan(1)
     usage = get_user_usage(1)
@@ -78,6 +103,17 @@ def create_project():
 
     volume_path = str(VOLUMES_DIR / f"{name}-{int(datetime.utcnow().timestamp())}")
     os.makedirs(volume_path, exist_ok=True)
+
+    # Extract ZIP into volume if provided
+    if zip_filename:
+        zip_path = UPLOADS_DIR / zip_filename
+        if zip_path.exists():
+            try:
+                with zipfile.ZipFile(zip_path, "r") as z:
+                    z.extractall(volume_path)
+            except Exception as e:
+                conn.close()
+                return jsonify({"error": f"ZIP extract failed: {e}"}), 400
 
     result = docker_worker.run_container(
         image=image,
@@ -127,6 +163,24 @@ def stop_project(pid):
     conn.close()
     return jsonify({"status": "stopped"})
 
+@api.route("/projects/<int:pid>/logs")
+def project_logs(pid):
+    conn = get_db()
+    proj = dict_from_row(conn.execute("SELECT * FROM projects WHERE id = ?", (pid,)).fetchone())
+    conn.close()
+    if not proj or not proj.get("container_id"):
+        return jsonify({"logs": "No container"})
+
+    client = docker_worker.get_client()
+    if not client:
+        return jsonify({"logs": "Docker unavailable"})
+    try:
+        c = client.containers.get(proj["container_id"])
+        logs = c.logs(tail=100).decode("utf-8", errors="replace")
+        return jsonify({"logs": logs or "(empty)"})
+    except Exception as e:
+        return jsonify({"logs": str(e)})
+
 @api.route("/projects/<int:pid>", methods=["DELETE"])
 def delete_project(pid):
     conn = get_db()
@@ -137,6 +191,10 @@ def delete_project(pid):
 
     if proj.get("container_id"):
         docker_worker.remove_container(proj["container_id"])
+
+    # Clean volume
+    if proj.get("volume_path") and os.path.exists(proj["volume_path"]):
+        shutil.rmtree(proj["volume_path"], ignore_errors=True)
 
     conn.execute("DELETE FROM projects WHERE id = ?", (pid,))
     if proj["status"] == "running":

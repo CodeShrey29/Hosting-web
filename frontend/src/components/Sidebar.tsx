@@ -12,16 +12,17 @@ import {
   Gamepad2,
   Terminal,
   X,
+  Cloud,
 } from 'lucide-react'
 import { cn } from '../lib/utils'
 
 const navItems = [
   {
-    section: 'OVERVIEW',
+    section: 'Overview',
     items: [{ to: '/', icon: LayoutDashboard, label: 'Dashboard' }],
   },
   {
-    section: 'HOST',
+    section: 'Deploy',
     items: [
       { to: '/deploy?type=minecraft', icon: Gamepad2, label: 'Minecraft' },
       { to: '/deploy?type=python', icon: Code, label: 'Python' },
@@ -31,18 +32,15 @@ const navItems = [
     ],
   },
   {
-    section: 'PROJECTS',
-    items: [{ to: '/projects', icon: FolderOpen, label: 'All Projects' }],
-  },
-  {
-    section: 'INFRASTRUCTURE',
+    section: 'Manage',
     items: [
+      { to: '/projects', icon: FolderOpen, label: 'Projects' },
       { to: '/servers', icon: Server, label: 'Servers' },
       { to: '/monitoring', icon: Activity, label: 'Monitoring' },
     ],
   },
   {
-    section: 'ACCOUNT',
+    section: 'Account',
     items: [
       { to: '/billing', icon: CreditCard, label: 'Billing' },
       { to: '/settings', icon: Settings, label: 'Settings' },
@@ -52,24 +50,29 @@ const navItems = [
 
 export default function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
   return (
-    <aside className="h-full w-64 bg-card border-r flex flex-col">
-      <div className="p-5 border-b flex items-center justify-between">
-        <div>
-          <h1 className="text-lg font-bold tracking-tight">Cloud Host</h1>
-          <p className="text-xs text-muted-foreground mt-0.5">India-first · Local PC</p>
+    <aside className="h-full w-64 bg-card/80 backdrop-blur-xl border-r flex flex-col">
+      <div className="p-5 flex items-center justify-between">
+        <div className="flex items-center gap-2.5">
+          <div className="h-8 w-8 rounded-lg bg-primary flex items-center justify-center">
+            <Cloud className="h-4 w-4 text-white" />
+          </div>
+          <div>
+            <h1 className="font-semibold text-sm">Cloud Host</h1>
+            <p className="text-[10px] text-muted-foreground">Local PC</p>
+          </div>
         </div>
         <button
           onClick={onNavigate}
-          className="lg:hidden p-1 rounded-md hover:bg-accent"
-          aria-label="Close menu"
+          className="lg:hidden p-1.5 rounded-md hover:bg-accent"
         >
-          <X className="h-5 w-5" />
+          <X className="h-4 w-4" />
         </button>
       </div>
-      <nav className="flex-1 overflow-y-auto p-3 space-y-5">
+
+      <nav className="flex-1 overflow-y-auto px-3 pb-4 space-y-6">
         {navItems.map((group) => (
           <div key={group.section}>
-            <h3 className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-1.5 px-3">
+            <h3 className="text-[10px] font-medium text-muted-foreground uppercase tracking-widest mb-2 px-3">
               {group.section}
             </h3>
             <div className="space-y-0.5">
@@ -80,14 +83,14 @@ export default function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
                   onClick={onNavigate}
                   className={({ isActive }) =>
                     cn(
-                      'flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-colors',
+                      'flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-all',
                       isActive
-                        ? 'bg-primary text-primary-foreground'
-                        : 'hover:bg-accent text-foreground'
+                        ? 'bg-primary text-white shadow-sm'
+                        : 'text-muted-foreground hover:text-foreground hover:bg-accent'
                     )
                   }
                 >
-                  <item.icon className="h-4 w-4 shrink-0" />
+                  <item.icon className="h-4 w-4" />
                   {item.label}
                 </NavLink>
               ))}
@@ -95,8 +98,12 @@ export default function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
           </div>
         ))}
       </nav>
-      <div className="p-4 border-t text-xs text-muted-foreground">
-        Running on this PC
+
+      <div className="p-4 mx-3 mb-3 rounded-lg bg-secondary/50 text-xs text-muted-foreground">
+        <div className="flex items-center gap-2">
+          <span className="h-2 w-2 rounded-full bg-green-500 animate-pulse" />
+          Worker healthy
+        </div>
       </div>
     </aside>
   )

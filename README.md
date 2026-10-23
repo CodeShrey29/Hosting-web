@@ -1,21 +1,23 @@
 # Hosting Platform — Local PC Edition
 
-Just run one command:
+Just run:
 
 ```bash
 python hosting.py
 ```
 
-It will automatically:
-1. Install Python dependencies if needed
-2. Build the frontend the first time (requires Node.js)
-3. Start the control plane + serve the UI
+## What works now
+- Real control plane (SQLite)
+- Docker containers with RAM limits + persistent volumes
+- Plan enforcement (Free: 512 MB RAM, 1 GB storage, 3 deployments)
+- Resource reservation on local worker
+- File upload endpoint
+- Live dashboard showing real usage vs plan limits
+- Auto-builds frontend on first run
 
-Open http://localhost:5000
+## Data location (on your PC)
+- Database: `data/hosting.db`
+- Volumes: `data/volumes/`
+- Uploads: `data/uploads/`
 
-## Requirements
-- Python 3.10+
-- Node.js + npm (only for the first frontend build)
-- Docker (for real container deployments)
-
-Everything stays on your PC. SQLite database in `data/hosting.db`.
+Everything stays on this machine. Docker required for real deployments.

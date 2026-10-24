@@ -2122,3 +2122,97 @@
 .admin-plan-row > span:last-child { color: #81796f; }
 .admin-alert-error { border-color: #ead3ca; color: #934d38; background: #fbf3ef; }
 .admin-alert-success { border-color: #d2e2d0; color: #4e7650; background: #f1f7f0; }
+
+@media (max-width: 760px) {
+  .welcome-screen {
+    overflow-x: clip;
+    padding-inline: 20px;
+  }
+
+  .welcome-header {
+    min-height: 68px;
+    gap: 12px;
+  }
+
+  .welcome-header > a { gap: 9px; }
+  .welcome-header > a > span:last-child > span:last-child { font-size: 8px; letter-spacing: 0.1em; }
+  .welcome-status { flex-shrink: 0; gap: 6px; font-size: 9px; }
+
+  .welcome-hero {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 47px;
+    padding-block: 57px 55px;
+  }
+
+  .welcome-copy h1 {
+    margin-top: 19px;
+    font-size: clamp(44px, 10.8vw, 70px);
+    line-height: 1.02;
+    letter-spacing: -0.06em;
+  }
+
+  .welcome-description { max-width: 44ch; margin-top: 18px; font-size: 14px; line-height: 1.7; }
+  .welcome-primary { min-height: 46px; margin-top: 22px; }
+  .welcome-copy > a:nth-of-type(2) { min-height: 38px; align-items: center; }
+  .welcome-social-proof { margin-top: 24px; }
+  .welcome-preview { width: 100%; max-width: 500px; justify-self: center; }
+  .welcome-preview-window { transform: none; }
+
+  .welcome-float-card {
+    position: relative;
+    right: auto;
+    bottom: auto;
+    width: fit-content;
+    max-width: calc(100% - 12px);
+    min-width: 0;
+    margin: 10px 6px 0 auto;
+    padding: 10px 12px;
+  }
+
+  .welcome-products { padding-block: 28px 30px; }
+  .welcome-section-heading { align-items: flex-start; flex-direction: column; gap: 9px; }
+  .welcome-section-heading h2 { font-size: 20px; }
+  .welcome-product-grid { grid-template-columns: minmax(0, 1fr); gap: 8px; }
+  .welcome-product-card { min-height: 65px; padding: 11px 12px; }
+
+  .welcome-access {
+    display: grid;
+    grid-template-columns: 36px minmax(0, 1fr);
+    align-items: start;
+    gap: 10px 12px;
+    padding: 15px;
+  }
+
+  .welcome-access-icon { width: 36px; height: 36px; }
+  .welcome-access > div:nth-child(2) { min-width: 0; }
+  .welcome-access h2 { font-size: 19px; line-height: 1.2; }
+  .welcome-access p:not(.welcome-section-label) { font-size: 10px; line-height: 1.6; }
+  .welcome-access > .welcome-primary { grid-column: 2; justify-self: start; margin-top: 2px; }
+  .welcome-footer { min-height: 64px; gap: 8px; margin-top: 18px; font-size: 8px; }
+}
+
+@media (max-width: 420px) {
+  .welcome-screen { padding-inline: 16px; }
+  .welcome-header { min-height: 62px; }
+  .welcome-header .brand-mark { width: 31px; height: 31px; }
+  .welcome-header > a > span:last-child > span:first-child { font-size: 12px; }
+  .welcome-header > a > span:last-child > span:last-child { font-size: 7px; }
+  .welcome-status { font-size: 8px; }
+  .welcome-hero { gap: 42px; padding-block: 47px 48px; }
+  .welcome-kicker { gap: 7px; font-size: 8px; letter-spacing: 0.09em; }
+  .welcome-kicker-rule { width: 16px; }
+  .welcome-copy h1 { font-size: clamp(42px, 11.4vw, 48px); }
+  .welcome-description { font-size: 13px; }
+  .welcome-preview-content { padding: 15px; }
+  .welcome-preview-top { padding-inline: 13px; }
+  .welcome-preview-list { gap: 10px; padding: 11px; }
+  .welcome-preview-list > div:first-child { align-items: flex-start; gap: 8px; }
+  .welcome-preview-list > div:first-child span:last-child { text-align: right; }
+  .welcome-preview-metrics > div { padding: 10px; }
+  .welcome-preview-caption { font-size: 8px; }
+  .welcome-float-card { font-size: 8px; }
+  .welcome-float-card strong { font-size: 9px; }
+  .welcome-section-heading h2 { font-size: 19px; }
+  .welcome-footer { align-items: flex-start; font-size: 7px; }
+  .welcome-footer > span { max-width: calc(100% - 66px); }
+}

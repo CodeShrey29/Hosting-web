@@ -140,9 +140,9 @@ export default function Dashboard() {
       <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
         <div>
           <div className="eyebrow"><span className={`status-dot ${error ? 'status-dot-muted' : ''}`} />{error ? 'Connection issue' : status?.mode === 'render' ? 'Render control plane' : 'Local control plane'}</div>
-          <h1 className="page-title mt-2">Overview</h1>
+          <h1 className="page-title mt-2">Your workspace</h1>
           <p className="mt-1.5 text-[13px] text-muted-foreground">
-            Manage deployments and resource allocations for this machine.
+            Your projects, capacity, and runtime health—together in one place.
           </p>
         </div>
         <div className="flex items-center gap-2">

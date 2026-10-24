@@ -1,6 +1,6 @@
 # Cloud Host control plane
 
-Cloud Host currently has a React dashboard and a Flask API. The dashboard reads projects, plans, worker status, and deployment templates from the API; it does not fabricate utilization charts or a Render worker.
+Cloud Host currently has a React dashboard and a Flask API. Unauthenticated visitors see the customer-facing welcome page; the small Admin link at the bottom opens the protected administrator sign-in at `/admin`. Customer accounts and customer sign-in are not implemented yet, so the welcome page does not expose project data. The dashboard reads projects, plans, worker status, and deployment templates from the API; it does not fabricate utilization charts or a Render worker.
 
 ## Run locally
 

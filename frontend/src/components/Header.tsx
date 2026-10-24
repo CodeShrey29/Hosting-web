@@ -4,7 +4,7 @@ import type { RefObject } from 'react'
 import { Command, LogOut, Menu, Moon, Search, Sun } from 'lucide-react'
 
 const pageNames: Record<string, string> = {
-  '/': 'Overview',
+  '/': 'Your workspace',
   '/projects': 'Projects',
   '/deploy': 'Deploy',
   '/servers': 'Workers',

@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
-import { Routes, Route } from 'react-router-dom'
+import { Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom'
 import Layout from './components/Layout'
 import Dashboard from './pages/Dashboard'
+import Welcome from './pages/Welcome'
 import Projects from './pages/Projects'
 import Deploy from './pages/Deploy'
 import Servers from './pages/Servers'
@@ -12,6 +13,8 @@ import Login from './pages/Login'
 import { apiFetch, setCsrfToken } from './lib/api'
 
 export default function App() {
+  const location = useLocation()
+  const navigate = useNavigate()
   const [auth, setAuth] = useState<{ loading: boolean; authenticated: boolean; email?: string; mode?: string; authRequired?: boolean; configurationError?: string }>({
     loading: true,
     authenticated: false,
@@ -49,11 +52,18 @@ export default function App() {
   }
 
   if (!auth.authenticated) {
-    return <Login configurationError={auth.configurationError} onAuthenticated={(email, _csrfToken, mode) => setAuth({ loading: false, authenticated: true, email, mode, authRequired: true })} />
+    if (location.pathname === '/admin') {
+      return <Login configurationError={auth.configurationError} onAuthenticated={(email, _csrfToken, mode) => {
+        setAuth({ loading: false, authenticated: true, email, mode, authRequired: true })
+        navigate('/', { replace: true })
+      }} />
+    }
+    return <Welcome />
   }
 
   return (
     <Routes>
+      <Route path="/admin" element={<Navigate to="/" replace />} />
       <Route path="/" element={<Layout onLogout={auth.authRequired ? () => void logout() : undefined} accountEmail={auth.email} />}>
         <Route index element={<Dashboard />} />
         <Route path="projects" element={<Projects />} />

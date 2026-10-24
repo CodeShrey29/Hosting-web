@@ -12,7 +12,7 @@ export default function Layout({ onLogout, accountEmail }: { onLogout?: () => vo
   const location = useLocation()
 
   useEffect(() => {
-    document.documentElement.classList.toggle('dark', window.localStorage.getItem('cloud-host-theme') !== 'light')
+    document.documentElement.classList.toggle('dark', window.localStorage.getItem('cloud-host-theme') === 'dark')
   }, [])
 
   useEffect(() => {

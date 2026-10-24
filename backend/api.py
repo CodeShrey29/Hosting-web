@@ -546,11 +546,14 @@ def create_project():
         conn.close()
 
 
-def get_project(conn, project_id):
-    return dict_from_row(conn.execute(
-        "SELECT * FROM projects WHERE id = ? AND user_id = ?",
-        (project_id, current_user_id()),
-    ).fetchone())
+def get_project(conn, project_id, admin_access=False):
+    if admin_access:
+        query = "SELECT * FROM projects WHERE id = ?"
+        params = (project_id,)
+    else:
+        query = "SELECT * FROM projects WHERE id = ? AND user_id = ?"
+        params = (project_id, current_user_id())
+    return dict_from_row(conn.execute(query, params).fetchone())
 
 
 def project_file_path(project, requested_path):
@@ -813,7 +816,7 @@ def stop_project(pid):
     conn = get_db()
     try:
         conn.execute("BEGIN IMMEDIATE")
-        project = get_project(conn, pid)
+        project = get_project(conn, pid, admin_access=session.get("role") == "admin")
         if not project:
             return api_error("Project not found.", 404)
         if project["status"] != "running":
@@ -839,7 +842,7 @@ def start_project(pid):
     conn = get_db()
     try:
         conn.execute("BEGIN IMMEDIATE")
-        project = get_project(conn, pid)
+        project = get_project(conn, pid, admin_access=session.get("role") == "admin")
         if not project:
             return api_error("Project not found.", 404)
         if project["status"] == "running":
@@ -877,7 +880,7 @@ def start_project(pid):
 def restart_project(pid):
     conn = get_db()
     try:
-        project = get_project(conn, pid)
+        project = get_project(conn, pid, admin_access=session.get("role") == "admin")
     finally:
         conn.close()
     if not project:
@@ -919,7 +922,7 @@ def delete_project(pid):
     conn = get_db()
     try:
         conn.execute("BEGIN IMMEDIATE")
-        project = get_project(conn, pid)
+        project = get_project(conn, pid, admin_access=session.get("role") == "admin")
         if not project:
             return api_error("Project not found.", 404)
         if project.get("container_id"):
@@ -1039,24 +1042,219 @@ def admin_stats():
 
 @api.route("/admin/users")
 def admin_users():
+    search = request.args.get("q", "").strip()
+    if len(search) > 254:
+        return api_error("Search query is too long.", 400)
+    try:
+        page = max(1, int(request.args.get("page", "1")))
+    except ValueError:
+        return api_error("Page must be a positive integer.", 400)
+    page_size = 25
+    offset = (page - 1) * page_size
     conn = get_db()
     try:
+        where = "users.id != 1"
+        params = []
+        if search:
+            where += " AND (users.email LIKE ? ESCAPE '\\' OR users.name LIKE ? ESCAPE '\\')"
+            escaped = search.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+            params.extend((f"%{escaped}%", f"%{escaped}%"))
+        total_users = conn.execute(
+            f"SELECT COUNT(*) AS count FROM users WHERE {where}", params
+        ).fetchone()["count"]
+        active_users = conn.execute(
+            f"SELECT COUNT(*) AS count FROM users WHERE {where} AND status = 'active'", params
+        ).fetchone()["count"]
         users = conn.execute(
             """SELECT users.id, users.email, users.name, users.status, users.created_at,
                       plans.name AS plan,
+                      users.plan_id,
                       COUNT(projects.id) AS project_count
                FROM users
                LEFT JOIN plans ON plans.id = users.plan_id
                LEFT JOIN projects ON projects.user_id = users.id
-               WHERE users.id != 1
+               WHERE """ + where + """
                GROUP BY users.id
-               ORDER BY users.created_at DESC, users.id DESC"""
+               ORDER BY users.created_at DESC, users.id DESC
+               LIMIT ? OFFSET ?""",
+            (*params, page_size, offset),
         ).fetchall()
-        active_count = sum(1 for user in users if user["status"] == "active")
         return jsonify({
             "users": [dict(user) for user in users],
-            "total_users": len(users),
-            "active_users": active_count,
+            "total_users": total_users,
+            "active_users": active_users,
+            "page": page,
+            "page_size": page_size,
+            "total_pages": max(1, math.ceil(total_users / page_size)),
         })
     finally:
         conn.close()
+
+
+@api.route("/admin/users/<int:user_id>", methods=["PATCH"])
+def update_admin_user(user_id):
+    if user_id == 1:
+        return api_error("The local system account cannot be managed here.", 400)
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict) or not data:
+        return api_error("Send a JSON object with status and/or plan_id.", 400)
+    allowed = {"status", "plan_id"}
+    if set(data) - allowed:
+        return api_error("Only account status and plan can be changed.", 400)
+    status = data.get("status")
+    plan_id = data.get("plan_id")
+    if status is not None and (
+        not isinstance(status, str) or status not in {"active", "suspended"}
+    ):
+        return api_error("Status must be active or suspended.", 400)
+    if plan_id is not None and (type(plan_id) is not int or plan_id < 1):
+        return api_error("Choose a valid plan.", 400)
+
+    conn = get_db()
+    try:
+        conn.execute("BEGIN IMMEDIATE")
+        user = conn.execute(
+            "SELECT id FROM users WHERE id = ? AND id != 1", (user_id,)
+        ).fetchone()
+        if not user:
+            return api_error("Customer account not found.", 404)
+        if plan_id is not None and not conn.execute(
+            "SELECT 1 FROM plans WHERE id = ?", (plan_id,)
+        ).fetchone():
+            return api_error("Plan not found.", 404)
+        updates = []
+        values = []
+        if status is not None:
+            updates.append("status = ?")
+            values.append(status)
+        if plan_id is not None:
+            updates.append("plan_id = ?")
+            values.append(plan_id)
+        conn.execute(
+            f"UPDATE users SET {', '.join(updates)} WHERE id = ?",
+            (*values, user_id),
+        )
+        conn.commit()
+        updated = conn.execute(
+            """SELECT users.id, users.email, users.status, users.plan_id,
+                      plans.name AS plan
+               FROM users LEFT JOIN plans ON plans.id = users.plan_id
+               WHERE users.id = ?""",
+            (user_id,),
+        ).fetchone()
+        return jsonify(dict(updated))
+    finally:
+        if conn.in_transaction:
+            conn.rollback()
+        conn.close()
+
+
+@api.route("/admin/projects")
+def admin_projects():
+    search = request.args.get("q", "").strip()
+    if len(search) > 254:
+        return api_error("Search query is too long.", 400)
+    try:
+        page = max(1, int(request.args.get("page", "1")))
+    except ValueError:
+        return api_error("Page must be a positive integer.", 400)
+    page_size = 25
+    offset = (page - 1) * page_size
+    where = "1 = 1"
+    params = []
+    if search:
+        where += " AND (projects.name LIKE ? ESCAPE '\\' OR users.email LIKE ? ESCAPE '\\')"
+        escaped = search.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+        params.extend((f"%{escaped}%", f"%{escaped}%"))
+    conn = get_db()
+    try:
+        total = conn.execute(
+            f"SELECT COUNT(*) AS count FROM projects "
+            "LEFT JOIN users ON users.id = projects.user_id WHERE " + where,
+            params,
+        ).fetchone()["count"]
+        projects = conn.execute(
+            """SELECT projects.id, projects.name, projects.type, projects.status,
+                      projects.ram_mb, projects.cpu_limit, projects.storage_mb,
+                      projects.created_at, users.email AS owner
+               FROM projects LEFT JOIN users ON users.id = projects.user_id
+               WHERE """ + where + """
+               ORDER BY projects.created_at DESC, projects.id DESC
+               LIMIT ? OFFSET ?""",
+            (*params, page_size, offset),
+        ).fetchall()
+        running = conn.execute(
+            "SELECT COUNT(*) AS count FROM projects WHERE status = 'running'"
+        ).fetchone()["count"]
+        return jsonify({
+            "projects": [dict(project) for project in projects],
+            "total_projects": total,
+            "running_projects": running,
+            "page": page,
+            "page_size": page_size,
+            "total_pages": max(1, math.ceil(total / page_size)),
+        })
+    finally:
+        conn.close()
+
+
+@api.route("/admin/projects/<int:project_id>/<action>", methods=["POST"])
+def admin_project_action(project_id, action):
+    if get_deployment_mode() == "render":
+        return api_error("No worker is enrolled with this control plane; workload actions are unavailable.", 503)
+    actions = {
+        "start": start_project,
+        "stop": stop_project,
+        "restart": restart_project,
+    }
+    handler = actions.get(action)
+    if not handler:
+        return api_error("Choose start, stop, or restart.", 404)
+    return handler(project_id)
+
+
+@api.route("/admin/projects/<int:project_id>", methods=["DELETE"])
+def admin_delete_project(project_id):
+    if get_deployment_mode() == "render":
+        return api_error("No worker is enrolled with this control plane; workload actions are unavailable.", 503)
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict) or data.get("confirm") is not True:
+        return api_error("Confirm project deletion explicitly.", 400)
+    return delete_project(project_id)
+
+
+@api.route("/admin/overview")
+def admin_overview():
+    conn = get_db()
+    try:
+        customers = conn.execute(
+            "SELECT COUNT(*) AS total, "
+            "SUM(CASE WHEN status = 'active' THEN 1 ELSE 0 END) AS active, "
+            "SUM(CASE WHEN status = 'suspended' THEN 1 ELSE 0 END) AS suspended "
+            "FROM users WHERE id != 1"
+        ).fetchone()
+        projects = conn.execute(
+            "SELECT COUNT(*) AS total, "
+            "SUM(CASE WHEN status = 'running' THEN 1 ELSE 0 END) AS running "
+            "FROM projects"
+        ).fetchone()
+        worker = dict_from_row(conn.execute("SELECT * FROM workers WHERE id = 1").fetchone())
+        plans = [dict(row) for row in conn.execute(
+            "SELECT id, name, ram_mb, storage_mb, cpu_limit, max_deployments "
+            "FROM plans ORDER BY id"
+        ).fetchall()]
+    finally:
+        conn.close()
+    return jsonify({
+        "customers": {
+            "total": customers["total"] or 0,
+            "active": customers["active"] or 0,
+            "suspended": customers["suspended"] or 0,
+        },
+        "projects": {"total": projects["total"] or 0, "running": projects["running"] or 0},
+        "worker": worker if get_deployment_mode() != "render" else None,
+        "docker": docker_worker.get_docker_info() if get_deployment_mode() != "render" else {"available": False},
+        "mode": get_deployment_mode(),
+        "storage": "persistent" if persistent_storage_available() else "ephemeral",
+        "plans": plans,
+    })

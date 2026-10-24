@@ -3,7 +3,7 @@ import { AlertCircle, Check, Database, HardDrive, MonitorCog, Moon, Shield, Sun 
 import { apiFetch } from '../lib/api'
 
 export default function Settings() {
-  const [dark, setDark] = useState(() => window.localStorage.getItem('cloud-host-theme') !== 'light')
+  const [dark, setDark] = useState(() => window.localStorage.getItem('cloud-host-theme') === 'dark')
   const [health, setHealth] = useState<'checking' | 'online' | 'offline'>('checking')
   const [deploymentMode, setDeploymentMode] = useState('unknown')
   const [storageMode, setStorageMode] = useState('unknown')

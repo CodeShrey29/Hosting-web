@@ -156,6 +156,62 @@ class ApiTestCase(unittest.TestCase):
         )
         self.assertNotIn("password_hash", result["users"][0])
         self.assertEqual(admin_client.get("/api/projects").status_code, 403)
+        searched_users = admin_client.get("/api/admin/users?q=first")
+        self.assertEqual(searched_users.status_code, 200)
+        self.assertEqual(searched_users.get_json()["total_users"], 1)
+        workload_list = admin_client.get("/api/admin/projects")
+        self.assertEqual(workload_list.get_json()["total_projects"], 1)
+        searched_projects = admin_client.get("/api/admin/projects?q=first-project")
+        self.assertEqual(searched_projects.status_code, 200)
+        self.assertEqual(searched_projects.get_json()["total_projects"], 1)
+        overview = admin_client.get("/api/admin/overview")
+        self.assertEqual(overview.status_code, 200)
+        self.assertEqual(overview.get_json()["customers"]["active"], 2)
+        csrf_token = admin_login.get_json()["csrf_token"]
+        self.set_mode("local-pc")
+        with patch.object(api_module.docker_worker, "stop_container", return_value={}):
+            stopped = admin_client.post(
+                f"/api/admin/projects/{project_id}/stop",
+                headers={"X-CSRF-Token": csrf_token},
+            )
+        self.assertEqual(stopped.status_code, 200)
+        self.assertEqual(stopped.get_json()["status"], "stopped")
+        unconfirmed_delete = admin_client.delete(
+            f"/api/admin/projects/{project_id}",
+            json={"confirm": False},
+            headers={"X-CSRF-Token": csrf_token},
+        )
+        self.assertEqual(unconfirmed_delete.status_code, 400)
+        deleted = admin_client.delete(
+            f"/api/admin/projects/{project_id}",
+            json={"confirm": True},
+            headers={"X-CSRF-Token": csrf_token},
+        )
+        self.assertEqual(deleted.status_code, 200)
+        self.assertEqual(deleted.get_json()["status"], "deleted")
+
+        suspended = admin_client.patch(
+            f"/api/admin/users/{first_user_id}",
+            json={"status": "suspended", "plan_id": 2},
+            headers={"X-CSRF-Token": csrf_token},
+        )
+        self.assertEqual(suspended.status_code, 200)
+        self.assertEqual(suspended.get_json()["status"], "suspended")
+        self.assertEqual(suspended.get_json()["plan_id"], 2)
+        self.assertEqual(first_client.get("/api/projects").status_code, 401)
+        invalid_status = admin_client.patch(
+            f"/api/admin/users/{first_user_id}",
+            json={"status": ["active"]},
+            headers={"X-CSRF-Token": csrf_token},
+        )
+        self.assertEqual(invalid_status.status_code, 400)
+        reactivated = admin_client.patch(
+            f"/api/admin/users/{first_user_id}",
+            json={"status": "active"},
+            headers={"X-CSRF-Token": csrf_token},
+        )
+        self.assertEqual(reactivated.status_code, 200)
+        self.assertEqual(first_client.get("/api/projects").status_code, 200)
 
     def test_registration_rejects_reserved_admin_email_and_weak_password(self):
         self.set_mode("render")

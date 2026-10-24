@@ -26,7 +26,7 @@ export default function Header({
   onLogout?: () => void
   accountEmail?: string
 }) {
-  const [dark, setDark] = useState(() => window.localStorage.getItem('cloud-host-theme') !== 'light')
+  const [dark, setDark] = useState(() => window.localStorage.getItem('cloud-host-theme') === 'dark')
   const location = useLocation()
 
   useEffect(() => {

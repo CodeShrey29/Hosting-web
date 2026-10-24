@@ -1,6 +1,6 @@
 # Cloud Host control plane
 
-Cloud Host currently has a React dashboard and a Flask API. Customers can create accounts with an email and password, then manage their own account workspace. New accounts are activated immediately on the free plan; email verification is not configured. The administrator signs in separately at `/admin` and gets a dedicated users panel at `/admin/panel`, not a customer purchasing workspace. The panel lists registered accounts, statuses, plans, and project counts. The dashboard reads projects, plans, worker status, and deployment templates from the API; it does not fabricate utilization charts or a Render worker.
+Cloud Host currently has a React dashboard and a Flask API. Customers can create accounts with an email and password, then manage their own account workspace. New accounts are activated immediately on the free plan; email verification is not configured. The administrator signs in separately at `/admin` and gets a dedicated operations console at `/admin/panel`, not a customer purchasing workspace. The console includes a platform overview, customer search and pagination, account suspension/reactivation, manual plan assignment, workload search, workload start/stop/restart/delete controls, and worker/runtime capacity status. No payment or checkout actions are exposed. Workload controls need the local Docker worker; hosted Render currently has no enrolled worker, so those controls are unavailable there.
 
 ## Run locally
 

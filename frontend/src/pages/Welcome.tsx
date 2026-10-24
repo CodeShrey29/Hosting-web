@@ -11,7 +11,6 @@ import {
   LockKeyhole,
   Server,
   ShieldCheck,
-  Sparkles,
   Terminal,
   Workflow,
 } from 'lucide-react'
@@ -51,7 +50,7 @@ export default function Welcome() {
           <span className="brand-mark flex h-10 w-10 items-center justify-center rounded-xl"><Cloud className="h-5 w-5 text-white" /></span>
           <span>
             <span className="block text-sm font-semibold tracking-tight">Cloud Host</span>
-            <span className="mt-0.5 block text-[10px] uppercase tracking-[0.16em] text-muted-foreground">A better way to launch</span>
+            <span className="mt-0.5 block text-[10px] uppercase tracking-[0.16em] text-muted-foreground">Your hosting workspace</span>
           </span>
         </Link>
         <span className="welcome-status">
@@ -62,10 +61,10 @@ export default function Welcome() {
 
       <section className="welcome-hero">
         <div className="welcome-copy">
-          <span className="welcome-kicker"><Sparkles className="h-3.5 w-3.5" />YOUR NEXT IDEA, ONLINE</span>
-          <h1>Build something<br /><span>worth sharing.</span></h1>
+          <span className="welcome-kicker"><span className="welcome-kicker-rule" />HOSTING, WITHOUT THE BUSYWORK</span>
+          <h1>Your projects,<br /><span>under control.</span></h1>
           <p className="welcome-description">
-            A calmer home for your apps, websites, and game servers. Launch projects, check on them, and keep moving.
+            Deploy websites, services, and game servers. Keep every project and its resources organized in one straightforward workspace.
           </p>
           <Link to="/signup" className="welcome-primary">
             Create a free account <ArrowRight className="h-4 w-4" />
@@ -88,7 +87,7 @@ export default function Welcome() {
             </div>
             <div className="welcome-preview-content">
               <div className="flex items-end justify-between gap-3">
-                <div><p className="text-[10px] text-muted-foreground">MONDAY, YOUR WAY</p><p className="mt-1 text-lg font-semibold tracking-tight">A clear view of it all.</p></div>
+                <div><p className="text-[10px] text-muted-foreground">WORKSPACE OVERVIEW</p><p className="mt-1 text-lg font-semibold tracking-tight">Everything in its place.</p></div>
                 <span className="welcome-preview-spark"><Workflow className="h-4 w-4" /></span>
               </div>
               <div className="welcome-preview-metrics">
@@ -96,18 +95,18 @@ export default function Welcome() {
                 <div><span className="welcome-preview-metric-icon welcome-preview-metric-purple"><Cpu className="h-3.5 w-3.5" /></span><p className="welcome-preview-value">Resources</p><span className="welcome-preview-caption">Know what you’re using</span></div>
               </div>
               <div className="welcome-preview-list">
-                <div className="flex items-center justify-between"><span className="text-[10px] font-semibold">A workspace that works for you</span><span className="text-[9px] text-muted-foreground">MADE SIMPLE</span></div>
+                <div className="flex items-center justify-between"><span className="text-[10px] font-semibold">Built around your work</span><span className="text-[9px] text-muted-foreground">YOUR PROJECTS</span></div>
                 {benefits.map((benefit) => <div key={benefit} className="flex items-center gap-2.5 text-[10px] text-muted-foreground"><span className="welcome-check"><Check className="h-2.5 w-2.5" /></span>{benefit}</div>)}
               </div>
             </div>
           </div>
-          <div className="welcome-float-card"><span className="welcome-float-icon"><Server className="h-4 w-4" /></span><span><strong>Made for your projects</strong><br /><small>From first deploy to what’s next</small></span><ChevronRight className="ml-auto h-4 w-4 text-muted-foreground" /></div>
+          <div className="welcome-float-card"><span className="welcome-float-icon"><Server className="h-4 w-4" /></span><span><strong>One home for every service</strong><br /><small>Deployments, status, and resources</small></span><ChevronRight className="ml-auto h-4 w-4 text-muted-foreground" /></div>
         </div>
       </section>
 
       <section className="welcome-products" aria-labelledby="welcome-products-title">
         <div className="welcome-section-heading">
-          <div><p className="welcome-section-label">ONE HOME, MANY POSSIBILITIES</p><h2 id="welcome-products-title">What are you building?</h2></div>
+          <div><p className="welcome-section-label">START WITH WHAT YOU NEED</p><h2 id="welcome-products-title">Choose a project type</h2></div>
           <Link to="/signup" className="welcome-text-link">Create an account <ArrowRight className="h-3.5 w-3.5" /></Link>
         </div>
         <div className="welcome-product-grid">

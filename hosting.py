@@ -10,8 +10,12 @@ import secrets
 import subprocess
 from pathlib import Path
 
+from dotenv import load_dotenv
 from flask import Flask, jsonify, request, send_from_directory
 from werkzeug.middleware.proxy_fix import ProxyFix
+
+BASE = Path(__file__).resolve().parent
+load_dotenv(BASE / ".env")
 
 from backend.db import init_db
 from backend.api import (
@@ -22,7 +26,6 @@ from backend.api import (
     persistent_storage_available,
 )
 
-BASE = Path(__file__).parent
 FRONTEND = BASE / "frontend"
 DIST = FRONTEND / "dist"
 

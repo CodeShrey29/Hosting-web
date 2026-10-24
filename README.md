@@ -10,7 +10,7 @@ Requirements: Python dependencies, Node.js/npm, and Docker for container provisi
 python hosting.py
 ```
 
-`hosting.py` builds the frontend if its generated assets are missing. The local server binds to `127.0.0.1` by default. If binding to a non-loopback `HOSTING_HOST`, configure `ADMIN_EMAIL` and `ADMIN_PASSWORD`; startup fails closed without them and authenticated sessions require HTTPS. To build the frontend explicitly:
+`hosting.py` builds the frontend if its generated assets are missing. The local server binds to `127.0.0.1` by default. Local environment variables can be placed in a root `.env` file; it is ignored by Git, and variables already set in the shell take precedence. If binding to a non-loopback `HOSTING_HOST`, configure `ADMIN_EMAIL` and `ADMIN_PASSWORD`; startup fails closed without them and authenticated sessions require HTTPS. To build the frontend explicitly:
 
 ```bash
 cd frontend

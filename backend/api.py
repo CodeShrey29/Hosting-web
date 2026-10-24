@@ -10,6 +10,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from flask import Blueprint, current_app, jsonify, request, send_file, session
+from werkzeug.security import check_password_hash, generate_password_hash
 from werkzeug.utils import secure_filename
 
 from . import docker_worker
@@ -26,8 +27,9 @@ from .templates import get_template, list_templates
 
 api = Blueprint("api", __name__, url_prefix="/api")
 PROJECT_NAME = re.compile(r"^[a-zA-Z0-9][a-zA-Z0-9._-]{0,47}$")
-PUBLIC_ENDPOINTS = {"/api/health", "/api/auth/me", "/api/auth/login"}
+PUBLIC_ENDPOINTS = {"/api/health", "/api/auth/me", "/api/auth/login", "/api/auth/register"}
 WRITE_METHODS = {"POST", "PUT", "PATCH", "DELETE"}
+EMAIL_ADDRESS = re.compile(r"^[^@\s]{1,64}@[^@\s.]+(?:\.[^@\s.]+)+$")
 
 
 def get_deployment_mode():
@@ -60,6 +62,45 @@ def persistent_storage_available():
         )
     )
 
+def current_identity():
+    role = session.get("role")
+    if role == "admin":
+        if not admin_auth_configured() or not hmac.compare_digest(
+            session.get("auth_version", ""), admin_auth_version()
+        ):
+            return None
+        return {"role": "admin", "email": os.environ["ADMIN_EMAIL"]}
+    if role == "customer":
+        user_id = session.get("user_id")
+        if not isinstance(user_id, int):
+            return None
+        conn = get_db()
+        try:
+            user = conn.execute(
+                "SELECT id, email, status FROM users WHERE id = ?", (user_id,)
+            ).fetchone()
+        finally:
+            conn.close()
+        if not user or user["status"] != "active":
+            return None
+        return {"role": "customer", "id": user["id"], "email": user["email"]}
+    return None
+
+def current_user_id():
+    identity = current_identity()
+    return identity["id"] if identity and identity["role"] == "customer" else 1
+
+def establish_session(role, email, csrf_token=None, user_id=None):
+    session.clear()
+    session.permanent = True
+    session["role"] = role
+    session["email"] = email
+    session["csrf_token"] = csrf_token or uuid.uuid4().hex
+    if role == "admin":
+        session["auth_version"] = admin_auth_version()
+    else:
+        session["user_id"] = user_id
+
 
 def api_error(message, status):
     return jsonify({"error": message}), status
@@ -71,15 +112,24 @@ def protect_api():
         return None
     if request.path in PUBLIC_ENDPOINTS:
         return None
-    if not auth_required():
-        return None
-    if not admin_auth_configured():
+    if auth_required() and not admin_auth_configured():
         return api_error("The control plane is not configured. Set ADMIN_EMAIL and ADMIN_PASSWORD.", 503)
-    if (
-        not session.get("authenticated")
-        or not hmac.compare_digest(session.get("auth_version", ""), admin_auth_version())
-    ):
+    admin_endpoint = (
+        request.path.startswith("/api/admin/")
+        or request.path == "/api/docker/containers"
+    )
+    identity = current_identity()
+    if admin_endpoint:
+        if not identity:
+            return api_error("Authentication required.", 401)
+        if identity["role"] != "admin":
+            return api_error("Administrator access required.", 403)
+    if not identity and not auth_required() and not session.get("role"):
+        return None
+    if not identity:
         return api_error("Authentication required.", 401)
+    if not admin_endpoint and identity["role"] == "admin" and request.path != "/api/auth/logout":
+        return api_error("Customer account access required.", 403)
     if request.method in WRITE_METHODS:
         supplied = request.headers.get("X-CSRF-Token", "")
         expected = session.get("csrf_token", "")
@@ -110,48 +160,39 @@ def health():
 
 @api.route("/auth/me")
 def me():
-    if not auth_required():
+    identity = current_identity()
+    if identity:
         return jsonify({
             "authenticated": True,
-            "email": "local@pc",
-            "mode": "local-pc",
-            "csrf_token": None,
-            "auth_required": False,
+            "email": identity["email"],
+            "role": identity["role"],
+            "mode": get_deployment_mode(),
+            "csrf_token": session.get("csrf_token"),
+            "auth_required": True,
         })
-    if not admin_auth_configured():
+    if auth_required() and not admin_auth_configured():
         return jsonify({
             "authenticated": False,
             "mode": get_deployment_mode(),
             "auth_required": True,
             "configuration_error": "Set ADMIN_EMAIL and an ADMIN_PASSWORD with at least 16 characters to enable the protected control plane.",
         }), 503
-    if (
-        not session.get("authenticated")
-        or not hmac.compare_digest(session.get("auth_version", ""), admin_auth_version())
-    ):
-        return jsonify({"authenticated": False, "mode": get_deployment_mode(), "auth_required": True})
     return jsonify({
-        "authenticated": True,
-        "email": session.get("email"),
+        "authenticated": False,
         "mode": get_deployment_mode(),
-        "auth_required": True,
-        "csrf_token": session.get("csrf_token"),
+        "auth_required": auth_required(),
     })
 
 
 @api.route("/auth/login", methods=["POST"])
 def login():
-    if not auth_required():
-        return jsonify({"authenticated": True, "mode": "local-pc", "auth_required": False})
-    if not admin_auth_configured():
+    if auth_required() and not admin_auth_configured():
         return api_error("Set ADMIN_EMAIL and an ADMIN_PASSWORD with at least 16 characters in the service environment before signing in.", 503)
     data = request.get_json(silent=True)
     if not isinstance(data, dict):
         return api_error("Send a JSON object with email and password.", 400)
     email = data.get("email", "")
     password = data.get("password", "")
-    configured_email = os.environ["ADMIN_EMAIL"]
-    configured_password = os.environ["ADMIN_PASSWORD"]
     if not isinstance(email, str) or not isinstance(password, str):
         return api_error("Email and password must be strings.", 400)
 
@@ -174,9 +215,23 @@ def login():
         if attempts >= 5:
             conn.commit()
             return api_error("Too many sign-in attempts. Try again in 15 minutes.", 429)
-        email_matches = hmac.compare_digest(email.strip().casefold(), configured_email.strip().casefold())
-        password_matches = hmac.compare_digest(password, configured_password)
-        if not (email_matches and password_matches):
+        configured_email = os.environ.get("ADMIN_EMAIL", "")
+        is_admin = bool(
+            admin_auth_configured()
+            and hmac.compare_digest(email.strip().casefold(), configured_email.strip().casefold())
+            and hmac.compare_digest(password, os.environ["ADMIN_PASSWORD"])
+        )
+        user = None
+        if not is_admin:
+            user = conn.execute(
+                "SELECT id, email, password_hash FROM users "
+                "WHERE email = ? COLLATE NOCASE AND status = 'active'",
+                (email.strip(),),
+            ).fetchone()
+        customer_matches = bool(
+            user and user["password_hash"] and check_password_hash(user["password_hash"], password)
+        )
+        if not (is_admin or customer_matches):
             conn.execute(
                 "INSERT INTO auth_login_attempts (client_key, attempted_at) VALUES (?, ?)",
                 (client_key, now.isoformat()),
@@ -188,20 +243,88 @@ def login():
     finally:
         conn.close()
 
-    session.clear()
-    session.permanent = True
-    session["authenticated"] = True
-    session["email"] = configured_email
-    session["auth_version"] = admin_auth_version()
-    session["csrf_token"] = uuid.uuid4().hex
+    role = "admin" if is_admin else "customer"
+    establish_session(
+        role,
+        configured_email if is_admin else user["email"],
+        user_id=None if is_admin else user["id"],
+    )
     return jsonify({
         "authenticated": True,
-        "email": configured_email,
+        "email": session["email"],
+        "role": role,
         "mode": get_deployment_mode(),
         "auth_required": True,
         "csrf_token": session["csrf_token"],
     })
 
+@api.route("/auth/register", methods=["POST"])
+def register():
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict):
+        return api_error("Send a JSON object with email and password.", 400)
+    email = data.get("email")
+    password = data.get("password")
+    if not isinstance(email, str) or not isinstance(password, str):
+        return api_error("Email and password must be strings.", 400)
+    email = email.strip().casefold()
+    if len(email) > 254 or not EMAIL_ADDRESS.fullmatch(email):
+        return api_error("Enter a valid email address.", 400)
+    if len(password) < 12 or len(password) > 128:
+        return api_error("Password must be between 12 and 128 characters.", 400)
+    if (
+        os.environ.get("ADMIN_EMAIL")
+        and hmac.compare_digest(email, os.environ["ADMIN_EMAIL"].strip().casefold())
+    ):
+        return api_error("This email address is reserved for the administrator.", 409)
+
+    client_ip = request.remote_addr or "unknown"
+    client_key = hmac.new(
+        str(current_app.secret_key).encode(), client_ip.encode(), hashlib.sha256
+    ).hexdigest()
+    conn = get_db()
+    try:
+        now = datetime.now(timezone.utc)
+        cutoff = (now - timedelta(minutes=15)).isoformat()
+        conn.execute("BEGIN IMMEDIATE")
+        conn.execute("DELETE FROM auth_login_attempts WHERE attempted_at < ?", (cutoff,))
+        attempts = conn.execute(
+            "SELECT COUNT(*) AS count FROM auth_login_attempts WHERE client_key = ?",
+            (client_key,),
+        ).fetchone()["count"]
+        if attempts >= 5:
+            conn.commit()
+            return api_error("Too many account attempts. Try again in 15 minutes.", 429)
+        conn.execute(
+            "INSERT INTO auth_login_attempts (client_key, attempted_at) VALUES (?, ?)",
+            (client_key, now.isoformat()),
+        )
+        existing = conn.execute(
+            "SELECT id FROM users WHERE email = ? COLLATE NOCASE", (email,)
+        ).fetchone()
+        if existing:
+            conn.commit()
+            return api_error("An account with this email already exists.", 409)
+        password_hash = generate_password_hash(password)
+        cursor = conn.execute(
+            "INSERT INTO users (email, name, plan_id, created_at, password_hash, status) "
+            "VALUES (?, ?, 1, ?, ?, 'active')",
+            (email, email.split("@", 1)[0], now.isoformat(), password_hash),
+        )
+        user_id = cursor.lastrowid
+        conn.commit()
+    finally:
+        conn.close()
+
+    establish_session("customer", email, user_id=user_id)
+    return jsonify({
+        "authenticated": True,
+        "email": email,
+        "role": "customer",
+        "mode": get_deployment_mode(),
+        "auth_required": True,
+        "csrf_token": session["csrf_token"],
+    }), 201
 
 @api.route("/auth/logout", methods=["POST"])
 def logout():
@@ -212,6 +335,7 @@ def logout():
 @api.route("/status")
 def status():
     mode = get_deployment_mode()
+    user_id = current_user_id()
     conn = get_db()
     try:
         worker = dict_from_row(conn.execute("SELECT * FROM workers WHERE id = 1").fetchone())
@@ -227,9 +351,10 @@ def status():
                 "reserved_storage_mb": None,
                 "last_seen": None,
             }
-        projects = conn.execute("SELECT COUNT(*) AS c FROM projects WHERE user_id = 1").fetchone()["c"]
-        plan = get_plan(1, conn)
-        usage = get_user_usage(1, conn)
+        projects = conn.execute("SELECT COUNT(*) AS c FROM projects WHERE user_id = ?", (user_id,)).fetchone()["c"]
+        account = conn.execute("SELECT plan_id FROM users WHERE id = ?", (user_id,)).fetchone()
+        plan = get_plan(account["plan_id"] if account else 1, conn)
+        usage = get_user_usage(user_id, conn)
         return jsonify({
             "worker": worker,
             "docker": docker_worker.get_docker_info() if mode != "render" else {"available": False},
@@ -260,11 +385,13 @@ def list_plans_route():
 
 @api.route("/projects", methods=["GET"])
 def list_projects():
+    user_id = current_user_id()
     conn = get_db()
     try:
         rows = conn.execute(
             "SELECT id, name, type, status, ram_mb, cpu_limit, storage_mb, host_port, created_at "
-            "FROM projects WHERE user_id = 1 ORDER BY created_at DESC, id DESC"
+            "FROM projects WHERE user_id = ? ORDER BY created_at DESC, id DESC",
+            (user_id,),
         ).fetchall()
         return jsonify([dict(row) for row in rows])
     finally:
@@ -310,16 +437,18 @@ def create_project():
     if command is not None and (not isinstance(command, str) or len(command) > 2048):
         return api_error("Container command is invalid.", 400)
 
+    user_id = current_user_id()
     conn = get_db()
     volume_path = None
     reserved = False
     container_id = None
     try:
         conn.execute("BEGIN IMMEDIATE")
-        plan = get_plan(1, conn)
+        account = conn.execute("SELECT plan_id FROM users WHERE id = ?", (user_id,)).fetchone()
+        plan = get_plan(account["plan_id"] if account else 1, conn)
         if not plan:
             return api_error("No plan is configured for this account.", 503)
-        usage = get_user_usage(1, conn)
+        usage = get_user_usage(user_id, conn)
         if usage["deployments"] >= plan["max_deployments"]:
             return api_error(f"Plan limit: max {plan['max_deployments']} running deployments.", 400)
         if ram_mb > plan["ram_mb"]:
@@ -384,8 +513,8 @@ def create_project():
         cursor = conn.execute(
             """INSERT INTO projects
                (user_id, name, type, status, ram_mb, storage_mb, cpu_limit, container_id, volume_path, host_port, created_at)
-               VALUES (1, ?, ?, 'running', ?, ?, ?, ?, ?, ?, ?)""",
-            (name.strip(), ptype, ram_mb, storage_mb, cpu_allocation, result.get("id"), volume_path, result.get("host_port"), now),
+               VALUES (?, ?, ?, 'running', ?, ?, ?, ?, ?, ?, ?)""",
+            (user_id, name.strip(), ptype, ram_mb, storage_mb, cpu_allocation, result.get("id"), volume_path, result.get("host_port"), now),
         )
         conn.commit()
         return jsonify({
@@ -419,7 +548,8 @@ def create_project():
 
 def get_project(conn, project_id):
     return dict_from_row(conn.execute(
-        "SELECT * FROM projects WHERE id = ? AND user_id = 1", (project_id,)
+        "SELECT * FROM projects WHERE id = ? AND user_id = ?",
+        (project_id, current_user_id()),
     ).fetchone())
 
 
@@ -833,11 +963,13 @@ def monitoring_metrics():
     client = docker_worker.get_client()
     if not client:
         return api_error("Docker daemon is unavailable; live metrics cannot be sampled.", 503)
+    user_id = current_user_id()
     conn = get_db()
     try:
         projects = conn.execute(
             "SELECT id, name, type, container_id, volume_path, storage_mb FROM projects "
-            "WHERE user_id = 1 AND status = 'running' ORDER BY id"
+            "WHERE user_id = ? AND status = 'running' ORDER BY id",
+            (user_id,),
         ).fetchall()
     finally:
         conn.close()
@@ -903,3 +1035,28 @@ def admin_stats():
         "worker": worker if get_deployment_mode() != "render" else None,
         "docker": docker_worker.get_docker_info() if get_deployment_mode() != "render" else {"available": False},
     })
+
+
+@api.route("/admin/users")
+def admin_users():
+    conn = get_db()
+    try:
+        users = conn.execute(
+            """SELECT users.id, users.email, users.name, users.status, users.created_at,
+                      plans.name AS plan,
+                      COUNT(projects.id) AS project_count
+               FROM users
+               LEFT JOIN plans ON plans.id = users.plan_id
+               LEFT JOIN projects ON projects.user_id = users.id
+               WHERE users.id != 1
+               GROUP BY users.id
+               ORDER BY users.created_at DESC, users.id DESC"""
+        ).fetchall()
+        active_count = sum(1 for user in users if user["status"] == "active")
+        return jsonify({
+            "users": [dict(user) for user in users],
+            "total_users": len(users),
+            "active_users": active_count,
+        })
+    finally:
+        conn.close()

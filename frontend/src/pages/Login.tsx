@@ -26,6 +26,7 @@ export default function Login({ configurationError, onAuthenticated }: LoginProp
       })
       const result = await response.json()
       if (!response.ok) throw new Error(result.error || 'Sign-in failed.')
+      if (result.role !== 'admin') throw new Error('Use the customer sign-in page for customer accounts.')
       if (typeof result.csrf_token !== 'string') throw new Error('The server did not establish a secure session.')
       setCsrfToken(result.csrf_token)
       onAuthenticated(result.email, result.csrf_token, result.mode)
@@ -49,13 +50,13 @@ export default function Login({ configurationError, onAuthenticated }: LoginProp
 
       <section className="login-layout">
         <div className="login-story">
-          <span className="welcome-kicker"><Sparkles className="h-3.5 w-3.5" />YOUR WORKSPACE, READY</span>
-          <h1>Good to have<br /><span>you back.</span></h1>
-          <p>Sign in to manage your projects, keep an eye on your services, and get back to building.</p>
+          <span className="welcome-kicker"><Sparkles className="h-3.5 w-3.5" />PLATFORM ADMINISTRATION</span>
+          <h1>Keep your<br /><span>users in view.</span></h1>
+          <p>Review customer accounts from a dedicated administrator panel, separate from customer workspaces.</p>
           <div className="login-story-list">
-            <span><span className="login-story-check"><Check className="h-3 w-3" /></span>Project and deployment controls</span>
-            <span><span className="login-story-check"><Check className="h-3 w-3" /></span>Live service and resource status</span>
-            <span><span className="login-story-check"><Check className="h-3 w-3" /></span>One place for your hosting workspace</span>
+            <span><span className="login-story-check"><Check className="h-3 w-3" /></span>Registered customer accounts</span>
+            <span><span className="login-story-check"><Check className="h-3 w-3" /></span>Account status and project counts</span>
+            <span><span className="login-story-check"><Check className="h-3 w-3" /></span>No customer purchasing flow</span>
           </div>
         </div>
 

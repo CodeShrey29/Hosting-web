@@ -69,13 +69,14 @@ class ApiTestCase(unittest.TestCase):
             200,
         )
         token = self.client.get("/api/auth/me").get_json()["csrf_token"]
-        self.assertEqual(self.client.get("/api/projects").status_code, 200)
+        self.assertEqual(self.client.get("/api/projects").status_code, 403)
+        self.assertEqual(self.client.get("/api/admin/users").status_code, 200)
         self.assertEqual(self.client.post("/api/auth/logout").status_code, 403)
         self.assertEqual(
             self.client.post("/api/auth/logout", headers={"X-CSRF-Token": token}).status_code,
             200,
         )
-        self.assertEqual(self.client.get("/api/projects").status_code, 401)
+        self.assertEqual(self.client.get("/api/admin/users").status_code, 401)
 
     def test_render_without_credentials_fails_closed(self):
         self.set_mode("render")
@@ -83,6 +84,93 @@ class ApiTestCase(unittest.TestCase):
         os.environ.pop("ADMIN_PASSWORD", None)
         self.assertEqual(self.client.get("/api/projects").status_code, 503)
         self.assertEqual(self.client.post("/api/auth/login", json={}).status_code, 503)
+
+    def test_customer_signup_isolated_from_other_users_and_admin_panel(self):
+        self.set_mode("render")
+        os.environ["ADMIN_EMAIL"] = "admin@example.test"
+        os.environ["ADMIN_PASSWORD"] = "correct-horse-battery"
+
+        first_client = self.client
+        first_signup = first_client.post(
+            "/api/auth/register",
+            json={"email": "first@example.test", "password": "long-secure-password-123"},
+        )
+        self.assertEqual(first_signup.status_code, 201)
+        self.assertEqual(first_signup.get_json()["role"], "customer")
+        conn = db.get_db()
+        try:
+            first_user_id = conn.execute(
+                "SELECT id FROM users WHERE email = ?", ("first@example.test",)
+            ).fetchone()["id"]
+            conn.execute(
+                """INSERT INTO projects
+                   (user_id, name, type, status, ram_mb, storage_mb, cpu_limit, created_at)
+                   VALUES (?, 'first-project', 'website', 'running', 128, 100, 0.5, datetime('now'))""",
+                (first_user_id,),
+            )
+            conn.commit()
+        finally:
+            conn.close()
+        self.assertEqual(len(first_client.get("/api/projects").get_json()), 1)
+
+        second_client = self.app.test_client()
+        second_signup = second_client.post(
+            "/api/auth/register",
+            json={"email": "second@example.test", "password": "another-secure-password"},
+        )
+        self.assertEqual(second_signup.status_code, 201)
+        self.assertEqual(second_client.get("/api/projects").get_json(), [])
+        conn = db.get_db()
+        try:
+            project_id = conn.execute(
+                "SELECT id FROM projects WHERE user_id = ?", (first_user_id,)
+            ).fetchone()["id"]
+        finally:
+            conn.close()
+        second_csrf = second_signup.get_json()["csrf_token"]
+        self.assertEqual(
+            second_client.post(
+                f"/api/projects/{project_id}/stop",
+                headers={"X-CSRF-Token": second_csrf},
+            ).status_code,
+            404,
+        )
+        self.assertEqual(first_client.get("/api/admin/users").status_code, 403)
+        self.assertEqual(second_client.get("/api/docker/containers").status_code, 403)
+
+        admin_client = self.app.test_client()
+        admin_login = admin_client.post(
+            "/api/auth/login",
+            json={"email": "admin@example.test", "password": "correct-horse-battery"},
+        )
+        self.assertEqual(admin_login.status_code, 200)
+        self.assertEqual(admin_login.get_json()["role"], "admin")
+        user_list = admin_client.get("/api/admin/users")
+        self.assertEqual(user_list.status_code, 200)
+        result = user_list.get_json()
+        self.assertEqual(result["total_users"], 2)
+        self.assertEqual(result["active_users"], 2)
+        self.assertEqual(
+            {user["email"] for user in result["users"]},
+            {"first@example.test", "second@example.test"},
+        )
+        self.assertNotIn("password_hash", result["users"][0])
+        self.assertEqual(admin_client.get("/api/projects").status_code, 403)
+
+    def test_registration_rejects_reserved_admin_email_and_weak_password(self):
+        self.set_mode("render")
+        os.environ["ADMIN_EMAIL"] = "admin@example.test"
+        os.environ["ADMIN_PASSWORD"] = "correct-horse-battery"
+        reserved = self.client.post(
+            "/api/auth/register",
+            json={"email": "ADMIN@example.test", "password": "long-secure-password"},
+        )
+        self.assertEqual(reserved.status_code, 409)
+        weak = self.client.post(
+            "/api/auth/register",
+            json={"email": "new@example.test", "password": "short"},
+        )
+        self.assertEqual(weak.status_code, 400)
 
     def test_weak_admin_password_is_rejected_and_rotation_expires_sessions(self):
         self.set_mode("render")
@@ -97,10 +185,10 @@ class ApiTestCase(unittest.TestCase):
         )
         self.assertEqual(login.status_code, 200)
         token = login.get_json()["csrf_token"]
-        self.assertEqual(self.client.get("/api/projects").status_code, 200)
+        self.assertEqual(self.client.get("/api/admin/users").status_code, 200)
 
         os.environ["ADMIN_PASSWORD"] = "a-different-strong-password"
-        self.assertEqual(self.client.get("/api/projects").status_code, 401)
+        self.assertEqual(self.client.get("/api/admin/users").status_code, 401)
         self.assertFalse(self.client.get("/api/auth/me").get_json()["authenticated"])
         self.assertNotEqual(token, "")
 
@@ -139,7 +227,7 @@ class ApiTestCase(unittest.TestCase):
         self.assertEqual(login.status_code, 200)
         self.assertTrue(login.get_json()["auth_required"])
         token = login.get_json()["csrf_token"]
-        self.assertEqual(self.client.get("/api/projects").status_code, 200)
+        self.assertEqual(self.client.get("/api/admin/users").status_code, 200)
         self.assertEqual(
             self.client.post("/api/auth/logout", headers={"X-CSRF-Token": token}).status_code,
             200,
@@ -149,10 +237,11 @@ class ApiTestCase(unittest.TestCase):
         self.set_mode("render")
         os.environ["ADMIN_EMAIL"] = "owner@example.test"
         os.environ["ADMIN_PASSWORD"] = "correct-horse-battery"
-        self.client.post(
-            "/api/auth/login",
-            json={"email": "owner@example.test", "password": "correct-horse-battery"},
+        signup = self.client.post(
+            "/api/auth/register",
+            json={"email": "customer@example.test", "password": "long-secure-password"},
         )
+        self.assertEqual(signup.status_code, 201)
         response = self.client.post(
             "/api/projects",
             json={"name": "api", "type": "python"},

@@ -66,7 +66,9 @@ def init_db():
         email TEXT UNIQUE,
         name TEXT,
         plan_id INTEGER DEFAULT 1,
-        created_at TEXT
+        created_at TEXT,
+        password_hash TEXT,
+        status TEXT NOT NULL DEFAULT 'active'
     );
 
     CREATE TABLE IF NOT EXISTS plans (
@@ -136,6 +138,12 @@ def init_db():
     INSERT OR IGNORE INTO users (id, email, name, plan_id, created_at)
     VALUES (1, 'local@pc', 'Local User', 1, datetime('now'));
     """)
+    user_columns = {row["name"] for row in c.execute("PRAGMA table_info(users)")}
+    if "password_hash" not in user_columns:
+        c.execute("ALTER TABLE users ADD COLUMN password_hash TEXT")
+    if "status" not in user_columns:
+        c.execute("ALTER TABLE users ADD COLUMN status TEXT NOT NULL DEFAULT 'active'")
+    c.execute("CREATE INDEX IF NOT EXISTS idx_users_status_created ON users(status, created_at)")
     c.execute("UPDATE plans SET price_inr = NULL WHERE id = 2 AND price_inr = 299")
     c.execute("UPDATE plans SET price_inr = NULL WHERE id = 3 AND price_inr = 999")
     project_columns = {row["name"] for row in c.execute("PRAGMA table_info(projects)")}

@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import {
-  ArrowDown,
   ArrowRight,
   Box,
   Check,
@@ -68,9 +67,10 @@ export default function Welcome() {
           <p className="welcome-description">
             A calmer home for your apps, websites, and game servers. Launch projects, check on them, and keep moving.
           </p>
-          <a href="#workspace-access" className="welcome-primary">
-            Explore your workspace <ArrowRight className="h-4 w-4" />
-          </a>
+          <Link to="/signup" className="welcome-primary">
+            Create a free account <ArrowRight className="h-4 w-4" />
+          </Link>
+          <Link to="/login" className="mt-3 inline-flex text-xs text-muted-foreground transition-colors hover:text-foreground">Already have an account? Sign in</Link>
           <div className="welcome-social-proof">
             <span className="welcome-proof-icon"><ShieldCheck className="h-4 w-4" /></span>
             <span><strong>Everything in one place</strong><br />Projects, resources, and status at a glance</span>
@@ -108,7 +108,7 @@ export default function Welcome() {
       <section className="welcome-products" aria-labelledby="welcome-products-title">
         <div className="welcome-section-heading">
           <div><p className="welcome-section-label">ONE HOME, MANY POSSIBILITIES</p><h2 id="welcome-products-title">What are you building?</h2></div>
-          <a href="#workspace-access" className="welcome-text-link">Take a look <ArrowDown className="h-3.5 w-3.5" /></a>
+          <Link to="/signup" className="welcome-text-link">Create an account <ArrowRight className="h-3.5 w-3.5" /></Link>
         </div>
         <div className="welcome-product-grid">
           {products.map(({ name, detail, icon: Icon, tone }) => (
@@ -125,10 +125,10 @@ export default function Welcome() {
         <div className="welcome-access-icon"><LockKeyhole className="h-5 w-5" /></div>
         <div className="min-w-0 flex-1">
           <p className="welcome-section-label">YOUR WORKSPACE</p>
-          <h2>Customer accounts are on the way.</h2>
-          <p>Customer sign-in isn’t enabled on this installation yet. Your projects stay private until customer accounts are ready.</p>
+          <h2>Your own private workspace.</h2>
+          <p>Create a free account with your email and password. Your projects and resource usage stay tied to your account.</p>
         </div>
-        <span className="welcome-coming-soon">COMING SOON</span>
+        <Link to="/signup" className="welcome-primary">Sign up <ArrowRight className="h-4 w-4" /></Link>
       </section>
 
       <footer className="welcome-footer">

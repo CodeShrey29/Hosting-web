@@ -10,12 +10,14 @@ import Monitoring from './pages/Monitoring'
 import Billing from './pages/Billing'
 import Settings from './pages/Settings'
 import Login from './pages/Login'
+import CustomerAuth from './pages/CustomerAuth'
+import AdminUsers from './pages/AdminUsers'
 import { apiFetch, setCsrfToken } from './lib/api'
 
 export default function App() {
   const location = useLocation()
   const navigate = useNavigate()
-  const [auth, setAuth] = useState<{ loading: boolean; authenticated: boolean; email?: string; mode?: string; authRequired?: boolean; configurationError?: string }>({
+  const [auth, setAuth] = useState<{ loading: boolean; authenticated: boolean; email?: string; role?: string; mode?: string; authRequired?: boolean; configurationError?: string }>({
     loading: true,
     authenticated: false,
   })
@@ -30,7 +32,7 @@ export default function App() {
         }
         if (!response.ok) throw new Error(data.error || 'Could not verify session.')
         setCsrfToken(data.csrf_token || null)
-        setAuth({ loading: false, authenticated: Boolean(data.authenticated), email: data.email, mode: data.mode, authRequired: data.auth_required })
+        setAuth({ loading: false, authenticated: Boolean(data.authenticated), email: data.email, role: data.role, mode: data.mode, authRequired: data.auth_required })
       })
       .catch(() => setAuth({ loading: false, authenticated: false, configurationError: 'Could not reach the control plane. Refresh after the service is available.' }))
     const handleUnauthorized = () => setAuth({ loading: false, authenticated: false, mode: 'render' })
@@ -44,6 +46,7 @@ export default function App() {
     } finally {
       setCsrfToken(null)
       setAuth({ loading: false, authenticated: false })
+      navigate('/', { replace: true })
     }
   }
 
@@ -51,19 +54,34 @@ export default function App() {
     return <main className="auth-loading"><span className="brand-mark flex h-10 w-10 items-center justify-center rounded-xl"><span className="h-2 w-2 animate-pulse rounded-full bg-white" /></span><p className="mt-4 text-xs text-muted-foreground">Connecting to your control plane…</p></main>
   }
 
+  if (auth.authenticated && auth.role === 'admin') {
+    if (location.pathname !== '/admin/panel') return <Navigate to="/admin/panel" replace />
+    return <AdminUsers email={auth.email} onLogout={() => void logout()} />
+  }
+
   if (!auth.authenticated) {
     if (location.pathname === '/admin') {
       return <Login configurationError={auth.configurationError} onAuthenticated={(email, _csrfToken, mode) => {
-        setAuth({ loading: false, authenticated: true, email, mode, authRequired: true })
-        navigate('/', { replace: true })
+        setAuth({ loading: false, authenticated: true, email, role: 'admin', mode, authRequired: true })
+        navigate('/admin/panel', { replace: true })
+      }} />
+    }
+    if (location.pathname === '/signup' || location.pathname === '/login') {
+      return <CustomerAuth mode={location.pathname === '/signup' ? 'signup' : 'login'} onAuthenticated={(email, csrfToken, mode, role) => {
+        setCsrfToken(csrfToken)
+        setAuth({ loading: false, authenticated: true, email, role, mode, authRequired: true })
+        navigate(role === 'admin' ? '/admin/panel' : '/', { replace: true })
       }} />
     }
     return <Welcome />
   }
 
+  if (location.pathname === '/admin' || location.pathname === '/admin/panel') {
+    return <Navigate to="/" replace />
+  }
+
   return (
     <Routes>
-      <Route path="/admin" element={<Navigate to="/" replace />} />
       <Route path="/" element={<Layout onLogout={auth.authRequired ? () => void logout() : undefined} accountEmail={auth.email} />}>
         <Route index element={<Dashboard />} />
         <Route path="projects" element={<Projects />} />

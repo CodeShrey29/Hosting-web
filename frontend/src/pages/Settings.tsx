@@ -53,7 +53,7 @@ export default function Settings() {
 
       <section className="inline-alert inline-alert-neutral items-start">
         <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
-        <p className="text-[11px] leading-relaxed">Protected deployments use single-administrator authentication. Customer accounts, roles, and tenant isolation are not implemented. Persistent storage and an authenticated remote worker are required before this can host customer workloads.</p>
+        <p className="text-[11px] leading-relaxed">Customer accounts use isolated project access, and administrator tools are available separately. Email verification, account recovery, persistent production storage, and an authenticated remote worker are not configured yet.</p>
       </section>
     </div>
   )

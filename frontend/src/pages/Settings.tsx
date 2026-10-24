@@ -1,17 +1,14 @@
 import { useEffect, useState } from 'react'
 import { AlertCircle, Check, Database, HardDrive, MonitorCog, Moon, Shield, Sun } from 'lucide-react'
 import { apiFetch } from '../lib/api'
+import ThemeToggle from '../components/ThemeToggle'
+import { useTheme } from '../lib/theme'
 
 export default function Settings() {
-  const [dark, setDark] = useState(() => window.localStorage.getItem('cloud-host-theme') === 'dark')
+  const { dark } = useTheme()
   const [health, setHealth] = useState<'checking' | 'online' | 'offline'>('checking')
   const [deploymentMode, setDeploymentMode] = useState('unknown')
   const [storageMode, setStorageMode] = useState('unknown')
-
-  useEffect(() => {
-    document.documentElement.classList.toggle('dark', dark)
-    window.localStorage.setItem('cloud-host-theme', dark ? 'dark' : 'light')
-  }, [dark])
 
   useEffect(() => {
     apiFetch('/api/health')
@@ -38,7 +35,7 @@ export default function Settings() {
         <div className="flex items-center gap-3 px-5 py-4">
           <span className="flex h-9 w-9 items-center justify-center rounded-lg border border-border bg-secondary/60 text-muted-foreground">{dark ? <Moon className="h-4 w-4" /> : <Sun className="h-4 w-4" />}</span>
           <div className="flex-1"><p className="text-xs font-semibold">Appearance</p><p className="mt-1 text-[10px] text-muted-foreground">Theme preference is saved in local browser storage.</p></div>
-          <button type="button" onClick={() => setDark((value) => !value)} className="secondary-button"><span className={`h-1.5 w-1.5 rounded-full ${dark ? 'bg-cyan-400' : 'bg-amber-400'}`} />{dark ? 'Dark' : 'Light'} theme</button>
+          <ThemeToggle />
         </div>
       </section>
 

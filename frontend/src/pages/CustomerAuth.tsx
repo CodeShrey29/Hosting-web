@@ -2,6 +2,7 @@ import { useState, type FormEvent } from 'react'
 import { AlertCircle, ArrowRight, Cloud, LockKeyhole, Mail } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { apiFetch } from '../lib/api'
+import ThemeToggle from '../components/ThemeToggle'
 
 interface CustomerAuthProps {
   mode: 'login' | 'signup'
@@ -45,7 +46,7 @@ export default function CustomerAuth({ mode, onAuthenticated }: CustomerAuthProp
           <span className="brand-mark flex h-10 w-10 items-center justify-center rounded-xl"><Cloud className="h-5 w-5 text-white" /></span>
           <span><span className="block text-sm font-semibold tracking-tight">Cloud Host</span><span className="mt-0.5 block text-[10px] uppercase tracking-[0.14em] text-muted-foreground">Customer workspace</span></span>
         </Link>
-        <span className="login-secure-label"><LockKeyhole className="h-3.5 w-3.5" />Secure account access</span>
+        <div className="auth-header-actions"><span className="login-secure-label"><LockKeyhole className="h-3.5 w-3.5" />Secure account access</span><ThemeToggle /></div>
       </header>
 
       <section className="login-layout">

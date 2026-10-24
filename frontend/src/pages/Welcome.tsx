@@ -14,6 +14,7 @@ import {
   Terminal,
   Workflow,
 } from 'lucide-react'
+import ThemeToggle from '../components/ThemeToggle'
 
 const products = [
   { name: 'Websites', detail: 'Launch a site in minutes', icon: Box, tone: 'welcome-product-cyan' },
@@ -53,10 +54,13 @@ export default function Welcome() {
             <span className="mt-0.5 block text-[10px] uppercase tracking-[0.16em] text-muted-foreground">Your hosting workspace</span>
           </span>
         </Link>
-        <span className="welcome-status">
-          <span className={`status-dot ${mode === 'unavailable' ? 'status-dot-muted' : ''}`} />
-          {mode === 'checking' ? 'Checking service' : mode === 'unavailable' ? 'Service status unavailable' : mode === 'render' ? 'Control plane online' : 'Local workspace'}
-        </span>
+        <div className="welcome-header-actions">
+          <span className="welcome-status">
+            <span className={`status-dot ${mode === 'unavailable' ? 'status-dot-muted' : ''}`} />
+            {mode === 'checking' ? 'Checking service' : mode === 'unavailable' ? 'Service status unavailable' : mode === 'render' ? 'Control plane online' : 'Local workspace'}
+          </span>
+          <ThemeToggle />
+        </div>
       </header>
 
       <section className="welcome-hero">

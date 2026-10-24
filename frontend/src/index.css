@@ -2123,6 +2123,263 @@
 .admin-alert-error { border-color: #ead3ca; color: #934d38; background: #fbf3ef; }
 .admin-alert-success { border-color: #d2e2d0; color: #4e7650; background: #f1f7f0; }
 
+.theme-toggle {
+  display: inline-flex;
+  min-height: 32px;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  border: 1px solid rgb(94 73 56 / 0.18);
+  border-radius: 6px;
+  padding: 0 10px;
+  color: #655d54;
+  background: rgb(255 254 250 / 0.72);
+  cursor: pointer;
+  font-size: 9px;
+  font-weight: 550;
+  transition: border-color 150ms ease, background 150ms ease, color 150ms ease, transform 150ms ease;
+}
+
+.theme-toggle:hover {
+  transform: translateY(-1px);
+  border-color: rgb(166 83 62 / 0.34);
+  color: #8f4936;
+  background: #fffefa;
+}
+
+.theme-toggle:focus-visible {
+  outline: 2px solid hsl(var(--primary) / 0.7);
+  outline-offset: 2px;
+}
+
+.theme-toggle-icon { display: inline-flex; color: #a6533e; }
+.theme-toggle-header { min-height: 34px; border-color: hsl(var(--border)); color: hsl(var(--muted-foreground)); background: hsl(var(--card) / 0.75); }
+.theme-toggle-header .theme-toggle-icon { color: hsl(var(--primary)); }
+.theme-toggle-header:hover { color: hsl(var(--foreground)); background: hsl(var(--card)); }
+.theme-toggle-header .theme-toggle-label { display: none; }
+.welcome-header-actions,
+.auth-header-actions { display: flex; align-items: center; gap: 12px; }
+
+.dark .welcome-screen {
+  color: #eee7dc;
+  background:
+    radial-gradient(ellipse at 86% 14%, rgb(168 91 67 / 0.12), transparent 35%),
+    linear-gradient(180deg, #201c19 0%, #191715 100%);
+}
+
+.dark .welcome-orb-one {
+  border-color: rgb(219 150 116 / 0.12);
+  box-shadow: 0 0 0 48px rgb(219 150 116 / 0.025), 0 0 0 96px rgb(219 150 116 / 0.015);
+}
+
+.dark .welcome-orb-two { background: radial-gradient(circle, rgb(180 124 91 / 0.12), transparent 68%); }
+.dark .welcome-header,
+.dark .welcome-products,
+.dark .welcome-footer { border-color: rgb(236 222 204 / 0.12); }
+.dark .welcome-header > a > span:last-child > span:first-child { color: #eee7dc; }
+.dark .welcome-header > a > span:last-child > span:last-child,
+.dark .welcome-status { color: #aaa095; }
+.dark .welcome-status .status-dot { background: #8db18a; }
+.dark .welcome-kicker { color: #d89478; }
+.dark .welcome-kicker-rule { background: #d89478; }
+.dark .welcome-copy h1 { color: #f0e9df; }
+.dark .welcome-copy h1 span { color: #d89478; }
+.dark .welcome-description,
+.dark .welcome-social-proof { color: #b1a79b; }
+.dark .welcome-social-proof strong { color: #e8e1d6; }
+.dark .welcome-primary { border-color: #c67458; color: #fff7ef; background: #a9573f; box-shadow: 0 5px 16px rgb(0 0 0 / 0.24); }
+.dark .welcome-primary:hover { background: #b86348; }
+.dark .welcome-copy > a:nth-of-type(2) { color: #c2b5a8; text-decoration-color: rgb(194 181 168 / 0.38); }
+.dark .welcome-proof-icon,
+.dark .welcome-access-icon,
+.dark .welcome-float-icon,
+.dark .welcome-preview-spark { border-color: rgb(216 147 118 / 0.2); color: #d89478; background: rgb(216 147 118 / 0.08); }
+.dark .welcome-preview-window { border-color: #494039; background: #27231f; box-shadow: 0 24px 60px rgb(0 0 0 / 0.32), 0 0 0 7px rgb(255 255 255 / 0.025); }
+.dark .welcome-preview-top { border-color: #403a34; }
+.dark .welcome-preview-top .brand-mark { background: linear-gradient(145deg, #c77c60, #9e4f3d); }
+.dark .welcome-preview-live,
+.dark .welcome-preview-content .text-muted-foreground,
+.dark .welcome-preview-caption { color: #a99e92; }
+.dark .welcome-preview-value,
+.dark .welcome-preview-content .text-foreground { color: #eee7dc; }
+.dark .welcome-preview-metrics > div,
+.dark .welcome-preview-list { border-color: #403a34; background: #211e1b; }
+.dark .welcome-preview-metric-icon { color: #d89478; background: rgb(216 147 118 / 0.1); }
+.dark .welcome-preview-metric-purple { color: #b4a5be; background: rgb(180 165 190 / 0.1); }
+.dark .welcome-check { color: #9dc094; background: rgb(157 192 148 / 0.12); }
+.dark .welcome-float-card { border-color: #494039; color: #e8e1d6; background: #29241f; box-shadow: 0 12px 30px rgb(0 0 0 / 0.3); }
+.dark .welcome-float-card small { color: #a99e92; }
+.dark .welcome-section-label { color: #a99e92; }
+.dark .welcome-section-heading h2,
+.dark .welcome-access h2 { color: #eee7dc; }
+.dark .welcome-text-link { color: #d89478; }
+.dark .welcome-product-card { border-color: #403a34; background: rgb(39 35 31 / 0.78); }
+.dark .welcome-product-card:hover { border-color: rgb(216 147 118 / 0.4); background: #2a2520; }
+.dark .welcome-product-cyan { color: #d89478; background: rgb(216 147 118 / 0.1); }
+.dark .welcome-product-violet { color: #b4a5be; background: rgb(180 165 190 / 0.11); }
+.dark .welcome-product-amber { color: #d2a36c; background: rgb(210 163 108 / 0.11); }
+.dark .welcome-product-card h3 { color: #e8e1d6; }
+.dark .welcome-product-card p,
+.dark .welcome-access p:not(.welcome-section-label) { color: #a99e92; }
+.dark .welcome-access { border-color: #403a34; background: rgb(39 35 31 / 0.72); }
+.dark .welcome-admin-link { color: #a99e92; }
+.dark .welcome-admin-link:hover { border-color: #494039; color: #eee7dc; background: #29241f; }
+
+.dark .login-screen,
+.dark .auth-loading {
+  color: #eee7dc;
+  background:
+    radial-gradient(ellipse at 12% 42%, rgb(168 91 67 / 0.12), transparent 38%),
+    radial-gradient(ellipse at 88% 8%, rgb(143 112 88 / 0.08), transparent 34%),
+    #1d1a17;
+}
+
+.dark .login-brandbar > a > span:last-child > span:first-child { color: #eee7dc; }
+.dark .login-brandbar > a > span:last-child > span:last-child { color: #a99e92; }
+.dark .login-secure-label { color: #b6ab9f; }
+.dark .login-secure-label svg,
+.dark .login-security-note svg { color: #9dc094; }
+.dark .login-story h1 { color: #f0e9df; }
+.dark .login-story h1 span { color: #d89478; }
+.dark .login-story > p,
+.dark .login-story-list { color: #b1a79b; }
+.dark .login-story-check { border-color: rgb(216 147 118 / 0.22); color: #d89478; background: rgb(216 147 118 / 0.1); }
+.dark .login-card { border-color: #494039; background: #27231f; box-shadow: 0 20px 60px rgb(0 0 0 / 0.25); }
+.dark .login-card h2,
+.dark .login-card .field-label { color: #eee7dc; }
+.dark .login-card p { color: #a99e92; }
+.dark .login-card .subtle-tag { border-color: #51473e; color: #c6a18f; }
+.dark .login-lock-icon { border-color: rgb(216 147 118 / 0.22); color: #d89478; background: rgb(216 147 118 / 0.1); }
+.dark .input-wrap { border-color: #51473e; background: #211e1b; }
+.dark .input-wrap:focus-within { border-color: #c47b60; box-shadow: 0 0 0 3px rgb(196 123 96 / 0.12); }
+.dark .login-input { color: #f0e9df; }
+.dark .login-input::placeholder { color: #92877b; }
+.dark .login-security-note,
+.dark .login-footer { border-color: #403a34; color: #a99e92; }
+.dark .login-footer .text-link { color: #b6ab9f; }
+.dark .login-footer .text-link:hover { color: #d89478; }
+
+.dark .theme-toggle { border-color: #51473e; color: #c6bbae; background: #29241f; }
+.dark .theme-toggle:hover { border-color: #98634f; color: #f0c1aa; background: #342921; }
+.dark .theme-toggle-icon,
+.dark .theme-toggle-header .theme-toggle-icon { color: #e5ae8e; }
+.dark .theme-toggle-header { border-color: #494039; color: #c6bbae; background: #27231f; }
+.dark .theme-toggle-header:hover { color: #f0e9df; background: #342e28; }
+
+.dark .admin-console { color: #eee7dc; background: #191715; }
+.dark .admin-rail,
+.dark .admin-topbar { border-color: #38312b; background: #201c19; }
+.dark .admin-brand { border-color: #38312b; }
+.dark .admin-brand-mark { color: #fff7ef; background: #a9573f; }
+.dark .admin-brand strong { color: #eee7dc; }
+.dark .admin-brand small,
+.dark .admin-rail-caption,
+.dark .admin-rail-bottom small { color: #a1968b; }
+.dark .admin-nav-item { color: #b6ab9f; }
+.dark .admin-nav-item:hover { color: #f0e9df; background: #2b2621; }
+.dark .admin-nav-item.is-active { color: #f0c1aa; background: #382923; }
+.dark .admin-nav-indicator { background: #d18a6c; }
+.dark .admin-rail-bottom { border-color: #38312b; }
+.dark .admin-rail-bottom strong { color: #ded4c8; }
+.dark .admin-breadcrumb { color: #a1968b; }
+.dark .admin-breadcrumb strong,
+.dark .admin-page-heading h1 { color: #eee7dc; }
+.dark .admin-account { color: #c0b4a8; }
+.dark .admin-account-avatar { border-color: #57463b; color: #efc0a8; background: #352922; }
+.dark .admin-signout { color: #c0b4a8; }
+.dark .admin-signout:hover { color: #f0e9df; }
+.dark .admin-eyebrow,
+.dark .admin-heading-subtitle { color: #afa397; }
+.dark .admin-eyebrow span,
+.dark .admin-inline-link,
+.dark .admin-save-plan { color: #e0a286; }
+.dark .admin-inline-link:hover { color: #f2c4ad; }
+.dark .admin-refresh { border-color: #4a4037; color: #d0c3b6; background: #27231f; }
+.dark .admin-refresh:hover:not(:disabled) { border-color: #9a6652; background: #342922; }
+.dark .admin-stat-card,
+.dark .admin-card { border-color: #403831; background: #24201c; box-shadow: 0 2px 10px rgb(0 0 0 / 0.16); }
+.dark .admin-stat-icon,
+.dark .admin-project-icon { border-color: #514238; color: #e0a286; background: #33261f; }
+.dark .admin-stat-label { color: #b6ab9f; }
+.dark .admin-stat-card strong,
+.dark .admin-card-heading h2 { color: #eee7dc; }
+.dark .admin-stat-card small,
+.dark .admin-card-heading p { color: #a1968b; }
+.dark .admin-card-heading,
+.dark .admin-health-note,
+.dark .admin-table tbody tr,
+.dark .admin-pagination { border-color: #3a332d; }
+.dark .admin-muted-icon { color: #d09a7d; }
+.dark .admin-health-line { color: #b6ab9f; }
+.dark .admin-health-line strong { color: #ded4c8; }
+.dark .admin-health-note { color: #a1968b; }
+.dark .admin-search { border-color: #4a4037; color: #a1968b; background: #1d1a17; }
+.dark .admin-search:focus-within { border-color: #b47a60; }
+.dark .admin-search input { color: #eee7dc; }
+.dark .admin-search input::placeholder { color: #94897d; }
+.dark .admin-search button { border-color: #4a4037; color: #e5b59c; background: #352720; }
+.dark .admin-search button:hover { color: #fff0e8; background: #493126; }
+.dark .admin-table thead { background: #29241f; }
+.dark .admin-table th { color: #a1968b; }
+.dark .admin-table tbody tr:hover { background: #2b2621; }
+.dark .admin-table td { color: #c0b4a8; }
+.dark .admin-user-cell strong,
+.dark .admin-project-name { color: #e7ded3; }
+.dark .admin-user-cell small { color: #a1968b; }
+.dark .admin-status { border-color: #51473e; color: #c0b4a8; }
+.dark .admin-status.active { border-color: #3d5940; color: #afd0a9; background: #253027; }
+.dark .admin-status.suspended { border-color: #614b35; color: #dbb17d; background: #30271d; }
+.dark .admin-plan-cell select { border-color: #51473e; color: #ded4c8; background: #2b2621; }
+.dark .admin-action-button,
+.dark .admin-project-actions button,
+.dark .admin-pagination button { border-color: #51473e; color: #c0b4a8; background: #2b2621; }
+.dark .admin-action-button:hover:not(:disabled),
+.dark .admin-project-actions button:hover:not(:disabled),
+.dark .admin-pagination button:hover:not(:disabled) { border-color: #98634f; color: #f0c1aa; }
+.dark .admin-action-button.danger:hover:not(:disabled),
+.dark .admin-project-actions button.delete:hover:not(:disabled) { border-color: #80564a; color: #e4a091; background: #38231f; }
+.dark .admin-action-button.positive:hover:not(:disabled) { border-color: #537457; color: #b1d9ad; background: #253027; }
+.dark .admin-empty,
+.dark .admin-pagination { color: #a1968b; }
+.dark .admin-capacity-row > div:first-child { color: #b6ab9f; }
+.dark .admin-capacity-row strong { color: #ded4c8; }
+.dark .admin-capacity-row strong small { color: #a1968b; }
+.dark .admin-capacity-track { background: #3a332d; }
+.dark .admin-capacity-track i { background: #d18a6c; }
+.dark .admin-plan-row { border-color: #3a332d; }
+.dark .admin-plan-row strong { color: #e7ded3; }
+.dark .admin-plan-row small,
+.dark .admin-plan-row > span:last-child { color: #a1968b; }
+.dark .admin-alert-error { border-color: #68453d; color: #e6aaa0; background: #33211e; }
+.dark .admin-alert-success { border-color: #455b43; color: #b4d4ad; background: #253027; }
+
+@media (max-width: 760px) {
+  .welcome-header-actions { gap: 8px; }
+  .welcome-status { font-size: 0; }
+  .welcome-status .status-dot { height: 7px; width: 7px; }
+  .welcome-header-actions .theme-toggle { min-height: 32px; padding-inline: 8px; }
+  .auth-header-actions { gap: 8px; }
+  .auth-header-actions .theme-toggle-label { display: none; }
+  .auth-header-actions .theme-toggle { width: 34px; padding: 0; }
+  .auth-header-actions .login-secure-label { font-size: 0; }
+  .auth-header-actions .login-secure-label svg { width: 17px; height: 17px; }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  html,
+  body,
+  .welcome-screen,
+  .login-screen,
+  .admin-console,
+  .app-shell,
+  .sidebar,
+  .topbar,
+  .panel {
+    transition: background-color 220ms ease, color 220ms ease, border-color 220ms ease;
+  }
+}
+
 @media (max-width: 760px) {
   .welcome-screen {
     overflow-x: clip;

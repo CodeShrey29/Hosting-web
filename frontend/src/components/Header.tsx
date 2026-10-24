@@ -1,7 +1,7 @@
-import { useEffect, useState } from 'react'
 import { useLocation } from 'react-router-dom'
 import type { RefObject } from 'react'
-import { Command, LogOut, Menu, Moon, Search, Sun } from 'lucide-react'
+import { Command, LogOut, Menu, Search } from 'lucide-react'
+import ThemeToggle from './ThemeToggle'
 
 const pageNames: Record<string, string> = {
   '/': 'Your workspace',
@@ -26,18 +26,7 @@ export default function Header({
   onLogout?: () => void
   accountEmail?: string
 }) {
-  const [dark, setDark] = useState(() => window.localStorage.getItem('cloud-host-theme') === 'dark')
   const location = useLocation()
-
-  useEffect(() => {
-    document.documentElement.classList.toggle('dark', dark)
-    window.localStorage.setItem('cloud-host-theme', dark ? 'dark' : 'light')
-  }, [dark])
-
-  useEffect(() => {
-    const savedTheme = window.localStorage.getItem('cloud-host-theme')
-    if (savedTheme) setDark(savedTheme === 'dark')
-  }, [])
 
   const openSearch = () => window.dispatchEvent(new Event('cloud-host:open-search'))
 
@@ -78,14 +67,7 @@ export default function Header({
         <button type="button" onClick={openSearch} aria-label="Open command search" className="icon-button sm:hidden">
           <Search className="h-4 w-4" />
         </button>
-        <button
-          type="button"
-          aria-label={dark ? 'Switch to light theme' : 'Switch to dark theme'}
-          onClick={() => setDark((value) => !value)}
-          className="icon-button"
-        >
-          {dark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-        </button>
+        <ThemeToggle className="theme-toggle-header" />
         <span className="mx-1 hidden h-5 w-px bg-border sm:block" />
         <span aria-label={accountEmail || 'Local host account'} title={accountEmail || 'Local host account'} className="ml-1 flex h-8 w-8 items-center justify-center rounded-full border border-border bg-gradient-to-br from-primary/25 to-cyan-400/10 text-[10px] font-semibold text-foreground">
           {(accountEmail || 'LH').slice(0, 2).toUpperCase()}

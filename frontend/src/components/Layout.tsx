@@ -12,10 +12,6 @@ export default function Layout({ onLogout, accountEmail }: { onLogout?: () => vo
   const location = useLocation()
 
   useEffect(() => {
-    document.documentElement.classList.toggle('dark', window.localStorage.getItem('cloud-host-theme') === 'dark')
-  }, [])
-
-  useEffect(() => {
     const mediaQuery = window.matchMedia('(max-width: 1023px)')
     const updateViewport = () => {
       setIsMobile(mediaQuery.matches)

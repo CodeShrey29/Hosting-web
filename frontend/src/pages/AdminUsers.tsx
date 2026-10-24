@@ -22,6 +22,7 @@ import {
   Users,
 } from 'lucide-react'
 import { apiFetch } from '../lib/api'
+import ThemeToggle from '../components/ThemeToggle'
 
 type Section = 'overview' | 'customers' | 'workloads' | 'infrastructure'
 
@@ -266,6 +267,7 @@ export default function AdminUsers({ email, onLogout }: { email?: string; onLogo
         <header className="admin-topbar">
           <div className="admin-breadcrumb"><span>Operations</span><span className="admin-slash">/</span><strong>{sections.find((item) => item.key === section)?.label}</strong></div>
           <div className="admin-top-actions">
+            <ThemeToggle />
             <span className="admin-account"><span className="admin-account-avatar">{(email || 'AD').slice(0, 2).toUpperCase()}</span><span>{email || 'Administrator'}</span></span>
             <button type="button" onClick={onLogout} className="admin-signout"><LogOut size={14} />Sign out</button>
           </div>

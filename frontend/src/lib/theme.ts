@@ -7,8 +7,14 @@ function storedTheme() {
   return window.localStorage.getItem(THEME_KEY) === 'dark'
 }
 
-export function applyTheme(dark: boolean) {
+function syncDocumentTheme(dark: boolean) {
   document.documentElement.classList.toggle('dark', dark)
+  const themeColor = document.querySelector<HTMLMetaElement>('meta[name="theme-color"]')
+  if (themeColor) themeColor.content = dark ? '#1f1c19' : '#f7f5f0'
+}
+
+export function applyTheme(dark: boolean) {
+  syncDocumentTheme(dark)
   window.localStorage.setItem(THEME_KEY, dark ? 'dark' : 'light')
   window.dispatchEvent(new CustomEvent(THEME_EVENT, { detail: dark }))
 }
@@ -19,7 +25,7 @@ export function useTheme() {
   useEffect(() => {
     const syncTheme = (event: Event) => {
       const next = event instanceof CustomEvent ? Boolean(event.detail) : storedTheme()
-      document.documentElement.classList.toggle('dark', next)
+      syncDocumentTheme(next)
       setDark(next)
     }
 
@@ -27,7 +33,7 @@ export function useTheme() {
       if (event.key === THEME_KEY || event.key === null) syncTheme(event)
     }
 
-    document.documentElement.classList.toggle('dark', dark)
+    syncDocumentTheme(dark)
     window.addEventListener(THEME_EVENT, syncTheme)
     window.addEventListener('storage', handleStorage)
     return () => {

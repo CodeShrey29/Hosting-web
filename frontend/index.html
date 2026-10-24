@@ -6,6 +6,11 @@
     <meta name="theme-color" content="#f7f5f0" />
     <meta name="description" content="A clear, capable workspace for deploying and managing your projects." />
     <title>Cloud Host — Control plane</title>
+    <script>
+      const darkTheme = window.localStorage.getItem('cloud-host-theme') === 'dark';
+      document.documentElement.classList.toggle('dark', darkTheme);
+      document.querySelector('meta[name="theme-color"]').content = darkTheme ? '#1f1c19' : '#f7f5f0';
+    </script>
   </head>
   <body class="bg-background text-foreground">
     <div id="root"></div>

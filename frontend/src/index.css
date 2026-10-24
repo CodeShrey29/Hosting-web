@@ -23,19 +23,19 @@
 
   .dark {
     color-scheme: dark;
-    --background: 30 8% 9%;
-    --foreground: 38 20% 92%;
-    --card: 30 7% 12%;
-    --card-foreground: 38 20% 92%;
-    --primary: 16 60% 62%;
+    --background: 28 10% 11%;
+    --foreground: 38 25% 92%;
+    --card: 28 9% 14%;
+    --card-foreground: 38 25% 92%;
+    --primary: 16 60% 63%;
     --primary-foreground: 25 18% 10%;
-    --secondary: 30 7% 17%;
-    --secondary-foreground: 38 20% 90%;
-    --muted: 30 7% 17%;
-    --muted-foreground: 32 8% 62%;
-    --accent: 30 7% 20%;
+    --secondary: 28 8% 19%;
+    --secondary-foreground: 38 22% 90%;
+    --muted: 28 8% 18%;
+    --muted-foreground: 32 10% 64%;
+    --accent: 25 10% 22%;
     --accent-foreground: 38 20% 92%;
-    --border: 30 7% 23%;
+    --border: 28 8% 25%;
   }
 
   * {
@@ -2153,7 +2153,8 @@
   outline-offset: 2px;
 }
 
-.theme-toggle-icon { display: inline-flex; color: #a6533e; }
+.theme-toggle-icon { display: inline-flex; color: #a6533e; transition: transform 220ms cubic-bezier(0.22, 1, 0.36, 1); }
+.theme-toggle:hover .theme-toggle-icon { transform: rotate(-12deg) scale(1.08); }
 .theme-toggle-header { min-height: 34px; border-color: hsl(var(--border)); color: hsl(var(--muted-foreground)); background: hsl(var(--card) / 0.75); }
 .theme-toggle-header .theme-toggle-icon { color: hsl(var(--primary)); }
 .theme-toggle-header:hover { color: hsl(var(--foreground)); background: hsl(var(--card)); }
@@ -2353,6 +2354,50 @@
 .dark .admin-plan-row > span:last-child { color: #a1968b; }
 .dark .admin-alert-error { border-color: #68453d; color: #e6aaa0; background: #33211e; }
 .dark .admin-alert-success { border-color: #455b43; color: #b4d4ad; background: #253027; }
+
+.dark .app-shell {
+  background-image:
+    radial-gradient(ellipse at 82% -12%, rgb(183 105 77 / 0.12), transparent 42%),
+    radial-gradient(ellipse at 4% 100%, rgb(143 112 88 / 0.045), transparent 40%);
+}
+
+.dark .sidebar {
+  border-color: rgb(232 215 194 / 0.1);
+  background: linear-gradient(180deg, rgb(42 37 32 / 0.98), rgb(34 30 26 / 0.98));
+}
+
+.dark .topbar {
+  border-color: rgb(232 215 194 / 0.1);
+  background: rgb(31 28 25 / 0.88);
+}
+
+.dark .app-shell .brand-mark {
+  background: linear-gradient(145deg, #d28a68, #a6533e 68%, #874332);
+  box-shadow: 0 5px 18px rgb(166 83 62 / 0.24), inset 0 1px 0 rgb(255 239 222 / 0.25);
+}
+
+.dark .app-shell .workspace-switcher {
+  border-color: rgb(232 215 194 / 0.12);
+  background: linear-gradient(135deg, rgb(255 247 235 / 0.045), rgb(255 247 235 / 0.018));
+}
+
+.dark .app-shell .workspace-switcher:hover {
+  border-color: rgb(210 138 104 / 0.3);
+  background: linear-gradient(135deg, rgb(210 138 104 / 0.09), rgb(255 247 235 / 0.025));
+}
+
+.dark .app-shell .text-cyan-300,
+.dark .app-shell .text-cyan-400 {
+  color: #d99a78;
+}
+
+.dark .app-shell .bg-cyan-400 {
+  background-color: #91ac84;
+}
+
+.dark .page-scroll {
+  scrollbar-color: #59483c transparent;
+}
 
 @media (max-width: 760px) {
   .welcome-header-actions { gap: 8px; }
